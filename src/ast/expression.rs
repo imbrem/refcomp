@@ -1,15 +1,20 @@
 use super::{Variable, Function, Callable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
-use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER, CSC488Parser};
-use pest::iterators::{Pair, Pairs};
+use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
+use pest::iterators::{Pair};
 use std::rc::Rc;
 
+//TODO: implement
+pub struct SymbolTable {
+
+}
+
 pub trait UnaryFolder {
-    fn fold(c: Constant, cfg : Configuration) -> Option<Constant>;
+    fn fold(c: Constant, cfg : &Configuration) -> Option<Constant>;
 }
 pub trait UnaryExpression {
-    fn new(expr : Expression, cfg : Configuration) -> Option<Expression>;
+    fn new(expr : Expression, cfg : &Configuration) -> Option<Expression>;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -18,7 +23,7 @@ pub struct Negation {
 }
 
 impl UnaryExpression for Negation {
-    fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
+    fn new(expr : Expression, cfg : &Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -36,7 +41,7 @@ impl UnaryExpression for Negation {
 }
 
 impl UnaryFolder for Negation {
-    fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
+    fn fold(c : Constant, _cfg : &Configuration) -> Option<Constant> {
         match c {
             Constant::Integer(i) => Some(Constant::Integer(-i)),
             _ => None
@@ -61,7 +66,7 @@ pub struct Arithmetic {
 }
 
 impl Arithmetic {
-    pub fn new(lhs : Expression, rhs : Expression, op : ArithmeticOp, cfg : Configuration)
+    pub fn new(lhs : Expression, rhs : Expression, op : ArithmeticOp, cfg : &Configuration)
     -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
@@ -79,7 +84,7 @@ impl Arithmetic {
         }
 
     }
-    pub fn fold(c : Constant, d : Constant, op : ArithmeticOp, _cfg : Configuration)
+    pub fn fold(c : Constant, d : Constant, op : ArithmeticOp, _cfg : &Configuration)
     -> Option<Constant> {
         match (c, d) {
             (Constant::Integer(c), Constant::Integer(d)) => match op {
@@ -103,7 +108,7 @@ pub struct Not {
 }
 
 impl UnaryExpression for Not {
-    fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
+    fn new(expr : Expression, cfg : &Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -122,7 +127,7 @@ impl UnaryExpression for Not {
 }
 
 impl UnaryFolder for Not {
-    fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
+    fn fold(c : Constant, _cfg : &Configuration) -> Option<Constant> {
         match c {
             Constant::Boolean(b) => Some(Constant::Boolean(!b)),
             _ => None
@@ -147,7 +152,7 @@ pub struct Logical {
 }
 
 impl Logical {
-    pub fn new(lhs : Expression, rhs : Expression, op : LogicalOp, cfg : Configuration)
+    pub fn new(lhs : Expression, rhs : Expression, op : LogicalOp, cfg : &Configuration)
     -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
@@ -165,7 +170,7 @@ impl Logical {
         }
 
     }
-    pub fn fold(c : Constant, d : Constant, op : LogicalOp, _cfg : Configuration)
+    pub fn fold(c : Constant, d : Constant, op : LogicalOp, _cfg : &Configuration)
     -> Option<Constant> {
         match (c, d) {
             (Constant::Boolean(c), Constant::Boolean(d)) => match op {
@@ -189,7 +194,7 @@ pub struct Comparison {
 }
 
 impl Comparison {
-    pub fn new(lhs : Expression, rhs : Expression, op : ComparisonOp, cfg : Configuration)
+    pub fn new(lhs : Expression, rhs : Expression, op : ComparisonOp, cfg : &Configuration)
     -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
@@ -212,7 +217,7 @@ impl Comparison {
         }
 
     }
-    pub fn fold(c : Constant, d : Constant, op : ComparisonOp, _cfg : Configuration)
+    pub fn fold(c : Constant, d : Constant, op : ComparisonOp, _cfg : &Configuration)
     -> Option<Constant> {
         match (c, d) {
             (Constant::Boolean(c), Constant::Boolean(d)) => match op {
@@ -288,8 +293,95 @@ pub enum Expression {
 }
 
 impl Expression {
-    pub fn from_pair(pair : Pair<Rule>) -> Option<Expression> {
-        None
+
+    fn parse_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+        if pair.as_rule() != Rule::primary_expression {return None;}
+        let pair = pair.into_inner().next().unwrap();
+        match pair.as_rule() {
+            Rule::integer => match str::parse::<i64>(pair.as_str()) {
+                Ok(i) => Some(Expression::Constant(Constant::Integer(i))),
+                _ => None
+            },
+            Rule::expression => Self::from_pair(pair, sym, cfg),
+            Rule::ternary_expression => panic!("Not yet implemented!"),
+            Rule::function_call => panic!("Not yet implemented!"),
+            Rule::kw_true => Some(Expression::Constant(Constant::Boolean(true))),
+            Rule::kw_false => Some(Expression::Constant(Constant::Boolean(false))),
+            Rule::variable => panic!("Not yet implemented!"),
+
+            _ => panic!("{:?} is not a valid primary expression!", pair)
+        }
+    }
+
+    fn parse_binary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+        let parse_primary = |pair : Pair<Rule>| {Self::parse_primary(pair, sym, cfg)};
+        let merge_arith = |lhs : Option<Expression>, op : Pair<Rule>, rhs : Option<Expression>|
+        -> Option<Expression> {
+            match (lhs, rhs) {
+                (Some(lhs), Some(rhs)) => match op.as_rule() {
+                    Rule::op_plus => Arithmetic::new(lhs, rhs, ArithmeticOp::Add, cfg),
+                    Rule::op_minus => Arithmetic::new(lhs, rhs, ArithmeticOp::Sub, cfg),
+                    Rule::op_times => Arithmetic::new(lhs, rhs, ArithmeticOp::Mul, cfg),
+                    Rule::op_divides => Arithmetic::new(lhs, rhs, ArithmeticOp::Div, cfg),
+                    op => panic!("{:?} is not a valid arithmetic binary operator!", op)
+                },
+                _ => None
+            }
+        };
+        BINARY_PRECEDENCE_CLIMBER.climb(pair.into_inner(), parse_primary, merge_arith)
+    }
+
+    fn parse_logical_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+        match pair.as_rule() {
+            Rule::comparison_expression => {
+                let mut pairs = pair.into_inner();
+                let lhs = match Self::parse_binary(pairs.next().unwrap(), sym, cfg) {
+                    Some(s) => s,
+                    None => {return None}
+                };
+                let op = match pairs.next().unwrap().as_rule() {
+                    Rule::op_eq => ComparisonOp::EQ,
+                    Rule::op_neq => ComparisonOp::NE,
+                    Rule::op_lt => ComparisonOp::LT,
+                    Rule::op_leq => ComparisonOp::LE,
+                    Rule::op_gt => ComparisonOp::GT,
+                    Rule::op_geq => ComparisonOp::GE,
+                    op => panic!("{:?} is not a valid comparison opertor", op)
+                };
+                let rhs = match Self::parse_binary(pairs.next().unwrap(), sym, cfg) {
+                    Some(s) => s,
+                    None => {return None}
+                };
+                Comparison::new(lhs, rhs, op, cfg)
+            },
+            Rule::binary_expression => Self::parse_binary(pair, sym, cfg),
+            Rule::not_expression => Not::new(
+                match Self::parse_logical_primary(pair, sym, cfg) {
+                    Some(s) => s,
+                    None => {return None}
+                },
+                cfg
+            ),
+            _ => panic!("{:?} is not a valid logical primary!", pair)
+        }
+    }
+
+    pub fn from_pair(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration)
+    -> Option<Expression> {
+        if pair.as_rule() != Rule::expression {return None;}
+        let logical_primary = |pair : Pair<Rule>| {Self::parse_logical_primary(pair, sym, cfg)};
+        let merge_logical = |lhs : Option<Expression>, op : Pair<Rule>, rhs : Option<Expression>|
+            -> Option<Expression>{
+            match (lhs, rhs) {
+                (Some(lhs), Some(rhs)) => match op.as_rule() {
+                    Rule::kw_and => Logical::new(lhs, rhs, LogicalOp::And, cfg),
+                    Rule::kw_or => Logical::new(lhs, rhs, LogicalOp::Or, cfg),
+                    op => panic!("{:?} is not a valid logical binary operator!", op)
+                },
+                _ => None
+            }
+        };
+        LOGICAL_PRECEDENCE_CLIMBER.climb(pair.into_inner(), logical_primary, merge_logical)
     }
 }
 
@@ -311,6 +403,8 @@ impl Typed for Expression {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::parser::CSC488Parser;
+    use pest::Parser;
 
     #[test]
     fn integer_expressions_are_folded_correctly() {
@@ -319,9 +413,35 @@ mod test {
                 Expression::Constant(Constant::Integer(1)),
                 Expression::Constant(Constant::Integer(1)),
                 ArithmeticOp::Add,
-                Configuration{}
+                &Configuration{}
             ),
             Some(Expression::Constant(Constant::Integer(2)))
+        )
+    }
+
+    #[test]
+    fn integer_expressions_are_parsed_correctly() {
+        let sym = SymbolTable{};
+        let cfg = Configuration{};
+        assert_eq!(
+            Expression::from_pair(
+                CSC488Parser::parse(Rule::expression, "1 + 1 * (3 + 3)").unwrap().next().unwrap(),
+                &sym, &cfg
+            ).unwrap(),
+            Expression::Constant(Constant::Integer(7))
+        )
+    }
+
+    #[test]
+    fn boolean_expressions_parse_correctly() {
+        let sym = SymbolTable{};
+        let cfg = Configuration{};
+        assert_eq!(
+            Expression::from_pair(
+                CSC488Parser::parse(Rule::expression, "1 + 1 * (3 + 3) > 3 * 3 or 1 < 1 + 1").unwrap().next().unwrap(),
+                &sym, &cfg
+            ).unwrap(),
+            Expression::Constant(Constant::Boolean(true))
         )
     }
 }

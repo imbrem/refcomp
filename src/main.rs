@@ -9,7 +9,7 @@ pub mod parser;
 pub mod ast;
 
 pub struct Configuration {
-    
+
 }
 
 fn main() {
