@@ -10,12 +10,13 @@ trait Callable {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Variable {
-    var_type : Type
+    var_type : Type,
+    name : String
 }
 
 impl Variable {
-    pub fn new(var_type : Type) -> Variable {
-        Variable{var_type : var_type}
+    pub fn new(name : String, var_type : Type) -> Variable {
+        Variable{name : name, var_type : var_type}
     }
 }
 
@@ -25,13 +26,14 @@ impl Typed for Variable {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Function {
+    name : String,
     arity : u32,
     ret_type : Type
 }
 
 impl Function {
-    pub fn new(arity : u32, ret_type : Type) -> Function {
-        Function{arity : arity, ret_type : ret_type}
+    pub fn new(name : String, arity : u32, ret_type : Type) -> Function {
+        Function{name : name, arity : arity, ret_type : ret_type}
     }
 }
 
@@ -45,11 +47,14 @@ impl Typed for Function {
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Procedure {
+    name : String,
     arity : u32
 }
 
 impl Procedure {
-    pub fn new(arity : u32) -> Procedure {Procedure{arity : arity}}
+    pub fn new(name : String, arity : u32) -> Procedure {
+        Procedure{name : name, arity : arity}
+    }
 }
 
 impl Callable for Procedure {

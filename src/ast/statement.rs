@@ -1,52 +1,53 @@
 use super::{Procedure, Variable};
 use super::expression::Expression;
+use std::rc::Rc;
 
-pub struct Assignment<'a> {
-    pub destination : &'a Variable,
-    pub value : Expression<'a>
-}
-
-pub struct ConditionalBranch<'a> {
-    pub condition : Expression<'a>,
-    pub scope : Scope<'a>
+pub struct Assignment {
+    pub destination : Rc<Variable>,
+    pub value : Expression
 }
 
-pub struct Conditional<'a> {
-    pub if_branch : ConditionalBranch<'a>,
-    pub elif_branches : Vec<ConditionalBranch<'a>>,
-    pub else_branch : Option<ConditionalBranch<'a>>
+pub struct ConditionalBranch {
+    pub condition : Expression,
+    pub scope : Scope
 }
 
-pub struct While<'a> {
-    pub condition : Expression<'a>,
-    pub scope : Scope<'a>
-}
-pub struct Repeat<'a> {
-    pub condition : Expression<'a>,
-    pub scope : Scope<'a>
-}
-pub struct ProcedureCall<'a> {
-    pub procedure : &'a Procedure
-}
-pub struct Scope<'a> {
-    pub statements : Vec<Statement<'a>>
+pub struct Conditional {
+    pub if_branch : ConditionalBranch,
+    pub elif_branches : Vec<ConditionalBranch>,
+    pub else_branch : Option<ConditionalBranch>
 }
 
-pub enum Statement<'a> {
-    Assignment(Assignment<'a>),
-    Conditional(Conditional<'a>),
-    While(While<'a>),
-    Repeat(Repeat<'a>),
+pub struct While {
+    pub condition : Expression,
+    pub scope : Scope
+}
+pub struct Repeat {
+    pub condition : Expression,
+    pub scope : Scope
+}
+pub struct ProcedureCall {
+    pub procedure : Rc<Procedure>
+}
+pub struct Scope {
+    pub statements : Vec<Statement>
+}
+
+pub enum Statement {
+    Assignment(Assignment),
+    Conditional(Conditional),
+    While(While),
+    Repeat(Repeat),
     Break(u32),
-    Return(Expression<'a>),
-    Print(Vec<OutputElement<'a>>),
+    Return(Expression),
+    Print(Vec<OutputElement>),
     Input(Vec<String>),
-    ProcedureCall(ProcedureCall<'a>),
-    Scope(Scope<'a>)
+    ProcedureCall(ProcedureCall),
+    Scope(Scope)
 }
 
-pub enum OutputElement<'a> {
-    Expression(Expression<'a>),
+pub enum OutputElement {
+    Expression(Expression),
     Text(String),
     Newline
 }

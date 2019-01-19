@@ -1,6 +1,7 @@
 use super::{Variable, Function, Callable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
+use std::rc::Rc;
 
 pub trait UnaryFolder {
     fn fold(c: Constant, cfg : Configuration) -> Option<Constant>;
@@ -10,11 +11,11 @@ pub trait UnaryExpression {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Negation<'a> {
-    arg : Box<Expression<'a>>
+pub struct Negation {
+    arg : Box<Expression>
 }
 
-impl<'a> UnaryExpression for Negation<'a> {
+impl UnaryExpression for Negation {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
@@ -32,7 +33,7 @@ impl<'a> UnaryExpression for Negation<'a> {
     }
 }
 
-impl<'a> UnaryFolder for Negation<'a> {
+impl UnaryFolder for Negation {
     fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
         match c {
             Constant::Integer(i) => Some(Constant::Integer(-i)),
@@ -41,7 +42,7 @@ impl<'a> UnaryFolder for Negation<'a> {
     }
 }
 
-impl<'a> Typed for Negation<'a> {
+impl Typed for Negation {
     fn get_type(&self) -> Type {self.arg.get_type()}
 }
 
@@ -51,15 +52,15 @@ pub enum ArithmeticOp {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Arithmetic<'a> {
-    lhs : Box<Expression<'a>>,
-    rhs : Box<Expression<'a>>,
+pub struct Arithmetic {
+    lhs : Box<Expression>,
+    rhs : Box<Expression>,
     op : ArithmeticOp
 }
 
-impl<'a> Arithmetic<'a> {
-    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : ArithmeticOp, cfg : Configuration)
-    -> Option<Expression<'a>> {
+impl Arithmetic {
+    pub fn new(lhs : Expression, rhs : Expression, op : ArithmeticOp, cfg : Configuration)
+    -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -90,16 +91,16 @@ impl<'a> Arithmetic<'a> {
     }
 }
 
-impl<'a> Typed for Arithmetic<'a> {
+impl Typed for Arithmetic {
     fn get_type(&self) -> Type {self.rhs.get_type()}
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Not<'a> {
-    arg : Box<Expression<'a>>
+pub struct Not {
+    arg : Box<Expression>
 }
 
-impl<'a> UnaryExpression for Not<'a> {
+impl UnaryExpression for Not {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
@@ -118,7 +119,7 @@ impl<'a> UnaryExpression for Not<'a> {
     }
 }
 
-impl<'a> UnaryFolder for Not<'a> {
+impl UnaryFolder for Not {
     fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
         match c {
             Constant::Boolean(b) => Some(Constant::Boolean(!b)),
@@ -127,7 +128,7 @@ impl<'a> UnaryFolder for Not<'a> {
     }
 }
 
-impl<'a> Typed for Not<'a> {
+impl Typed for Not {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
@@ -137,15 +138,15 @@ pub enum LogicalOp {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Logical<'a> {
-    lhs : Box<Expression<'a>>,
-    rhs : Box<Expression<'a>>,
+pub struct Logical {
+    lhs : Box<Expression>,
+    rhs : Box<Expression>,
     op : LogicalOp
 }
 
-impl<'a> Logical<'a> {
-    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : LogicalOp, cfg : Configuration)
-    -> Option<Expression<'a>> {
+impl Logical {
+    pub fn new(lhs : Expression, rhs : Expression, op : LogicalOp, cfg : Configuration)
+    -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -174,20 +175,20 @@ impl<'a> Logical<'a> {
     }
 }
 
-impl<'a> Typed for Logical<'a> {
+impl Typed for Logical {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Comparison<'a> {
-    lhs : Box<Expression<'a>>,
-    rhs : Box<Expression<'a>>,
+pub struct Comparison {
+    lhs : Box<Expression>,
+    rhs : Box<Expression>,
     op : ComparisonOp
 }
 
-impl<'a> Comparison<'a> {
-    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : ComparisonOp, cfg : Configuration)
-    -> Option<Expression<'a>> {
+impl Comparison {
+    pub fn new(lhs : Expression, rhs : Expression, op : ComparisonOp, cfg : Configuration)
+    -> Option<Expression> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -236,20 +237,20 @@ pub enum ComparisonOp {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct FunctionCall<'a> {
-    function : &'a Function,
-    arguments : Vec<Expression<'a>>
+pub struct FunctionCall {
+    function : Rc<Function>,
+    arguments : Vec<Expression>
 }
 
-impl<'a> FunctionCall<'a> {
-    pub fn new(function : &'a Function, arguments : Vec<Expression<'a>>) -> Option<Expression<'a>> {
+impl FunctionCall {
+    pub fn new(function : Rc<Function>, arguments : Vec<Expression>) -> Option<Expression> {
         if function.get_arity() == arguments.len() {Some(
             Expression::FunctionCall(FunctionCall{function : function, arguments : arguments})
         )} else {None}
     }
 }
 
-impl<'a> Typed for FunctionCall<'a> {
+impl Typed for FunctionCall {
     fn get_type(&self) -> Type {self.function.get_type()}
 }
 
@@ -269,18 +270,18 @@ impl Typed for Constant {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Expression<'a> {
+pub enum Expression {
     Constant(Constant),
-    Negation(Negation<'a>),
-    Arithmetic(Arithmetic<'a>),
-    Not(Not<'a>),
-    Logical(Logical<'a>),
-    Comparison(Comparison<'a>),
-    Variable(&'a Variable),
-    FunctionCall(FunctionCall<'a>)
+    Negation(Negation),
+    Arithmetic(Arithmetic),
+    Not(Not),
+    Logical(Logical),
+    Comparison(Comparison),
+    Variable(Rc<Variable>),
+    FunctionCall(FunctionCall)
 }
 
-impl<'a> Typed for Expression<'a> {
+impl Typed for Expression {
     //TODO: implement
     fn get_type(&self) -> Type {Type::Null}
 }
