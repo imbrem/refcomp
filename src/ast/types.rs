@@ -6,7 +6,7 @@ pub struct ArrayType {
     pub element_type : ScalarType,
     pub dims : Vec<u32>
 }
-pub enum ExpressionType {
+pub enum Type {
     ScalarType(ScalarType),
     ArrayType(ArrayType)
 }

@@ -72,7 +72,7 @@ primary_expression = {
     | function_call
     | kw_true
     | kw_false
-    | identifier
+    | variable
     | negation_expression
 }
 ternary_expression = {"(" ~ expression ~ kw_if ~ expression ~ kw_else ~ expression ~ ")"}
@@ -149,8 +149,10 @@ output = {
 input = {
     variable ~ ("," ~ variable)*
 }
+array_indexer = {"[" ~ expression ~ "]"}
+array_index = {array_name ~ array_indexer+}
 
-variable = _{variable_name}
+variable = _{array_index | variable_name}
 variable_name = _{identifier}
 procedure_name = _{identifier}
 parameter_name = _{identifier}
