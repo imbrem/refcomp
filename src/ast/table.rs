@@ -82,6 +82,9 @@ impl Symbol {
             Symbol::Procedure(p) => p.get_name()
         }
     }
+    pub fn variable(name : String, var_type : Type) -> Symbol {
+        Symbol::Variable(Rc::new(Variable::new(name, var_type)))
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]

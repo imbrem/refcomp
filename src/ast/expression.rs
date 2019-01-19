@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Callable, SymbolTable};
+use super::table::{Variable, Function, Callable, Symbol, SymbolTable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
 use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
@@ -303,8 +303,14 @@ impl Expression {
             Rule::function_call => panic!("Not yet implemented!"),
             Rule::kw_true => Some(Expression::Constant(Constant::Boolean(true))),
             Rule::kw_false => Some(Expression::Constant(Constant::Boolean(false))),
-            Rule::variable => panic!("Not yet implemented!"),
-
+            Rule::array_index => panic!("Not yet implemented!"),
+            Rule::identifier => match sym.dereference(pair.as_str()) {
+                Some(v) => match v {
+                    Symbol::Variable(v) => Some(Expression::Variable(v)),
+                    _ => None
+                },
+                _ => None
+            },
             _ => panic!("{:?} is not a valid primary expression!", pair)
         }
     }
@@ -440,6 +446,22 @@ mod test {
                 &sym, &cfg
             ).unwrap(),
             Expression::Constant(Constant::Boolean(true))
+        )
+    }
+
+    #[test]
+    fn variables_parse_correctly() {
+        let mut sym = SymbolTable::new();
+        let cfg = Configuration{};
+        let vx = Rc::new(Variable::new("x".to_string(), Type::ScalarType(ScalarType::Integer)));
+        let x = Symbol::Variable(vx.clone());
+        sym.define(x);
+        assert_eq!(
+            Expression::from_pair(
+                CSC488Parser::parse(Rule::expression, "x").unwrap().next().unwrap(),
+                &sym, &cfg
+            ).unwrap(),
+            Expression::Variable(vx)
         )
     }
 }
