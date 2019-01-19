@@ -3,6 +3,7 @@ pub mod statement;
 pub mod expression;
 
 use self::types::{Type, Typed};
+use self::statement::Scope;
 
 trait Callable {
     fn get_arity(&self) -> usize;
@@ -24,17 +25,20 @@ impl Typed for Variable {
     fn get_type(&self) -> Type {return self.var_type.clone()}
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Function {
     name : String,
     arity : u32,
-    ret_type : Type
+    ret_type : Type,
+    fn_impl : Option<Scope>
 }
 
 impl Function {
-    pub fn new(name : String, arity : u32, ret_type : Type) -> Function {
-        Function{name : name, arity : arity, ret_type : ret_type}
-    }
+    pub fn new(name : String, arity : u32, ret_type : Type, fn_impl : Scope)
+    -> Function {Function{
+        name : name, arity : arity, ret_type : ret_type,
+        fn_impl : Some(fn_impl)
+    }}
 }
 
 impl Callable for Function {
@@ -45,15 +49,16 @@ impl Typed for Function {
     fn get_type(&self) -> Type {self.ret_type.clone()}
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, PartialEq)]
 pub struct Procedure {
     name : String,
-    arity : u32
+    arity : u32,
+    pr_impl : Option<Scope>
 }
 
 impl Procedure {
-    pub fn new(name : String, arity : u32) -> Procedure {
-        Procedure{name : name, arity : arity}
+    pub fn new(name : String, arity : u32, pr_impl : Scope) -> Procedure {
+        Procedure{name : name, arity : arity, pr_impl : Some(pr_impl)}
     }
 }
 

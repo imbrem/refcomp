@@ -10,7 +10,7 @@ pub trait UnaryExpression {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression>;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Negation {
     arg : Box<Expression>
 }
@@ -46,12 +46,12 @@ impl Typed for Negation {
     fn get_type(&self) -> Type {self.arg.get_type()}
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ArithmeticOp {
     Add, Sub, Mul, Div
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Arithmetic {
     lhs : Box<Expression>,
     rhs : Box<Expression>,
@@ -95,7 +95,7 @@ impl Typed for Arithmetic {
     fn get_type(&self) -> Type {self.rhs.get_type()}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Not {
     arg : Box<Expression>
 }
@@ -132,12 +132,12 @@ impl Typed for Not {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LogicalOp {
     And, Or
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Logical {
     lhs : Box<Expression>,
     rhs : Box<Expression>,
@@ -179,7 +179,7 @@ impl Typed for Logical {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Comparison {
     lhs : Box<Expression>,
     rhs : Box<Expression>,
@@ -231,12 +231,12 @@ impl Comparison {
     }
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ComparisonOp {
     EQ, NE, LT, LE, GT, GE
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct FunctionCall {
     function : Rc<Function>,
     arguments : Vec<Expression>
@@ -254,7 +254,7 @@ impl Typed for FunctionCall {
     fn get_type(&self) -> Type {self.function.get_type()}
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Constant {
     Integer(i64), // Should be 32 bit, but is reduced based off configuration later
     Boolean(bool)
@@ -269,7 +269,7 @@ impl Typed for Constant {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Constant(Constant),
     Negation(Negation),
