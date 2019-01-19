@@ -78,20 +78,35 @@ primary_expression = {
 ternary_expression = {"(" ~ expression ~ kw_if ~ expression ~ kw_else ~ expression ~ ")"}
 function_call = {identifier ~ "(" ~ arguments? ~ ")"}
 negation_expression = {op_minus ~ expression}
-not_expression = {kw_not ~ expression}
 
 op_plus = {"+"}
 op_minus = {"-"}
 op_times = {"*"}
 op_divides = {"/"}
+op_eq = {"=="}
+op_neq = {"!="}
+op_lt = {"<"}
+op_leq = {"<="}
+op_gt = {">"}
+op_geq = {">="}
 
 binary_operator = _{
     op_plus | op_minus | op_times | op_divides
 }
+comparison_operator = _{
+  op_eq | op_neq | op_lt | op_leq | op_gt | op_geq
+}
+
 binary_expression = {
     primary_expression ~ (binary_operator ~ primary_expression)*
 }
+comparison_expression = {
+  binary_expression ~ comparison_operator ~ binary_expression
+}
+not_expression = {kw_not ~ logical_expression}
+
 logical_expression = _{
+    comparison_expression |
     binary_expression |
     not_expression
 }
@@ -140,7 +155,7 @@ variable_name = _{identifier}
 procedure_name = _{identifier}
 parameter_name = _{identifier}
 array_name = _{identifier}
-identifier = {!keyword ~ ("_"|ASCII_ALPHA) ~ ("_"|ASCII_ALPHANUMERIC)*}
-integer = {"0"|(ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
-text = {"\"" ~ string_text ~ "\""}
-string_text = {(!NEWLINE ~ ASCII)*}
+identifier = @{!keyword ~ ("_"|ASCII_ALPHA) ~ ("_"|ASCII_ALPHANUMERIC)*}
+integer = @{"0"|(ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
+text = @{"\"" ~ string_text ~ "\""}
+string_text = @{(!NEWLINE ~ ASCII)*}

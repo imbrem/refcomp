@@ -7,4 +7,5 @@ edition = "2018"
 [dependencies]
 pest = "^2.1.0"
 pest_derive = "^2.1.0"
+lazy_static = "^1.2.0"
 inkwell = { git = "https://github.com/TheDan64/inkwell", branch = "llvm7-0" }

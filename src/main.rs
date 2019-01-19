@@ -2,10 +2,33 @@
 extern crate pest;
 #[macro_use]
 extern crate pest_derive;
+#[macro_use]
+extern crate lazy_static;
+
+use pest::prec_climber::{PrecClimber, Operator, Assoc};
 
 #[derive(Parser)]
 #[grammar="grammar488.pest"]
 pub struct CSC488Parser;
+
+fn get_binary_precedence_climber() -> PrecClimber<Rule> {
+    PrecClimber::new(vec![
+        Operator::new(Rule::op_plus, Assoc::Left) | Operator::new(Rule::op_minus, Assoc::Left),
+        Operator::new(Rule::op_times, Assoc::Left) | Operator::new(Rule::op_divides, Assoc::Left)
+    ])
+}
+
+fn get_logical_precedence_climber() -> PrecClimber<Rule> {
+    PrecClimber::new(vec![
+        Operator::new(Rule::kw_and, Assoc::Left),
+        Operator::new(Rule::kw_or, Assoc::Left)
+    ])
+}
+
+lazy_static! {
+    static ref BINARY_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_binary_precedence_climber();
+    static ref LOGICAL_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_logical_precedence_climber();
+}
 
 #[cfg(test)]
 mod test {
@@ -48,6 +71,24 @@ mod test {
                             [primary_expression(20, 24, [kw_true(20, 24)])])]),
                 ])])
             ])])])]
+        )
+    }
+
+    #[test]
+    fn arithmetic_expressions_parse_correctly() {
+        parses_to!(
+            parser : CSC488Parser,
+            input : "1 + 1 < 2",
+            rule : Rule::expression,
+            tokens : [expression(0, 9, [comparison_expression(0, 9, [
+                binary_expression(0, 5, [
+                        primary_expression(0, 1, [integer(0, 1)]),
+                        op_plus(2, 3),
+                        primary_expression(4, 5, [integer(4, 5)])
+                    ]),
+                op_lt(6, 7),
+                binary_expression(8, 9, [primary_expression(8, 9, [integer(8, 9)])])
+                ])])]
         )
     }
 }
