@@ -16,11 +16,11 @@ kw_print = _{"print"}
 kw_input = _{"input"}
 kw_var = _{"var"}
 kw_func = _{"func"}
-kw_true = _{"true"}
-kw_false = _{"false"}
+kw_true = {"true"}
+kw_false = {"false"}
 kw_not = _{"not"}
-kw_and = _{"and"}
-kw_or = _{"or"}
+kw_and = {"and"}
+kw_or = {"or"}
 
 keyword = {
     kw_if | kw_else | kw_while | kw_repeat | kw_until | kw_break | kw_return | kw_print | kw_input
