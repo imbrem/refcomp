@@ -6,6 +6,7 @@ extern crate pest_derive;
 extern crate lazy_static;
 
 pub mod parser;
+pub mod ast;
 
 fn main() {
     println!("Hello world!");
