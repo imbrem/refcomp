@@ -1,10 +1,16 @@
 use super::table::{Procedure, Variable};
-use super::expression::Expression;
+use super::expression::{Expression, ArrayIndex};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
+pub enum AssignmentDestination {
+    Variable(Rc<Variable>),
+    ArrayIndex(ArrayIndex)
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Assignment {
-    pub destination : Rc<Variable>,
+    pub destination : AssignmentDestination,
     pub value : Expression
 }
 

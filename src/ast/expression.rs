@@ -1,5 +1,5 @@
 use super::table::{Variable, Function, Callable, Symbol, SymbolTable};
-use super::types::{Type, Typed, ScalarType};
+use super::types::{Type, Typed, ScalarType, ArrayType};
 use crate::Configuration;
 use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
 use pest::iterators::{Pair};
@@ -276,6 +276,42 @@ impl Typed for Constant {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ArrayIndex {
+    variable : Rc<Variable>,
+    index : Vec<Expression>,
+    idx_type : Type
+}
+
+impl ArrayIndex {
+    pub fn new(variable : Rc<Variable>, index : Vec<Expression>) -> Option<Expression> {
+        match variable.get_type() {
+            Type::ArrayType(a) => {
+                let new_type = if index.len() == a.get_dims().len() {
+                    Type::ScalarType(a.get_element_type())
+                } else if index.len() < a.get_dims().len() {
+                    Type::ArrayType(Rc::new(ArrayType::new(
+                        a.get_element_type(),
+                        a.get_dims()[..a.get_dims().len() - index.len()].to_vec())))
+                } else {
+                    return None
+                };
+                for expr in &index {
+                    if expr.get_type() != Type::ScalarType(ScalarType::Integer) {return None}
+                }
+                Some(Expression::ArrayIndex(ArrayIndex{
+                        variable : variable, index : index, idx_type : new_type
+                }))
+            },
+            _ => None
+        }
+    }
+}
+
+impl Typed for ArrayIndex {
+    fn get_type(&self) -> Type {self.idx_type.clone()}
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Expression {
     Constant(Constant),
     Negation(Negation),
@@ -284,6 +320,7 @@ pub enum Expression {
     Logical(Logical),
     Comparison(Comparison),
     Variable(Rc<Variable>),
+    ArrayIndex(ArrayIndex),
     FunctionCall(FunctionCall)
 }
 
@@ -303,7 +340,25 @@ impl Expression {
             Rule::function_call => panic!("Not yet implemented!"),
             Rule::kw_true => Some(Expression::Constant(Constant::Boolean(true))),
             Rule::kw_false => Some(Expression::Constant(Constant::Boolean(false))),
-            Rule::array_index => panic!("Not yet implemented!"),
+            Rule::array_index => {
+                let mut pairs = pair.into_inner();
+                let var = match sym.dereference(pairs.next().unwrap().as_str()) {
+                    Some(v) => match v {
+                        Symbol::Variable(v) => v,
+                        _ => {return None}
+                    },
+                    None => {return None}
+                };
+                let mut idxers = Vec::new();
+                for pair in pairs {
+                    assert_eq!(pair.as_rule(), Rule::array_indexer);
+                    idxers.push(match Self::from_pair(pair, sym, cfg) {
+                        Some(e) => e,
+                        None => {return None}
+                    });
+                }
+                ArrayIndex::new(var, idxers)
+            }
             Rule::identifier => match sym.dereference(pair.as_str()) {
                 Some(v) => match v {
                     Symbol::Variable(v) => Some(Expression::Variable(v)),
@@ -399,6 +454,7 @@ impl Typed for Expression {
             Expression::Logical(l) => l.get_type(),
             Expression::Comparison(c) => c.get_type(),
             Expression::Variable(v) => v.get_type(),
+            Expression::ArrayIndex(a) => a.get_type(),
             Expression::FunctionCall(f) => f.get_type()
         }
     }
