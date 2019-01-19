@@ -43,6 +43,15 @@ impl Typed for Function {
     fn get_type(&self) -> Type {self.ret_type.clone()}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Procedure {
+    arity : u32
+}
 
+impl Procedure {
+    pub fn new(arity : u32) -> Procedure {Procedure{arity : arity}}
+}
+
+impl Callable for Procedure {
+    fn get_arity(&self) -> usize {self.arity as usize}
 }
