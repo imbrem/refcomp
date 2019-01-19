@@ -1,4 +1,4 @@
-use super::{Variable, Function};
+use super::{Variable, Function, Callable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
 
@@ -228,6 +228,18 @@ pub enum ComparisonOp {
 pub struct FunctionCall<'a> {
     function : &'a Function,
     arguments : Vec<Expression<'a>>
+}
+
+impl<'a> FunctionCall<'a> {
+    pub fn new(function : &'a Function, arguments : Vec<Expression<'a>>) -> Option<Expression<'a>> {
+        if function.get_arity() == arguments.len() {Some(
+            Expression::FunctionCall(FunctionCall{function : function, arguments : arguments})
+        )} else {None}
+    }
+}
+
+impl<'a> Typed for FunctionCall<'a> {
+    fn get_type(&self) -> Type {self.function.get_type()}
 }
 
 pub enum Constant {
