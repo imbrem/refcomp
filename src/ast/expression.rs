@@ -1,14 +1,9 @@
-use super::{Variable, Function, Callable};
+use super::table::{Variable, Function, Callable, SymbolTable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
 use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
 use pest::iterators::{Pair};
 use std::rc::Rc;
-
-//TODO: implement
-pub struct SymbolTable {
-
-}
 
 pub trait UnaryFolder {
     fn fold(c: Constant, cfg : &Configuration) -> Option<Constant>;
@@ -421,7 +416,7 @@ mod test {
 
     #[test]
     fn integer_expressions_are_parsed_correctly() {
-        let sym = SymbolTable{};
+        let sym = SymbolTable::new();
         let cfg = Configuration{};
         assert_eq!(
             Expression::from_pair(
@@ -434,7 +429,7 @@ mod test {
 
     #[test]
     fn boolean_expressions_parse_correctly() {
-        let sym = SymbolTable{};
+        let sym = SymbolTable::new();
         let cfg = Configuration{};
         assert_eq!(
             Expression::from_pair(

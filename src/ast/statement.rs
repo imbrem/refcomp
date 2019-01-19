@@ -1,4 +1,4 @@
-use super::{Procedure, Variable};
+use super::table::{Procedure, Variable};
 use super::expression::Expression;
 use std::rc::Rc;
 
