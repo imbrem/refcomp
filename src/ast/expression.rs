@@ -1,4 +1,4 @@
-use super::Variable;
+use super::{Variable, Function};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
 
@@ -9,11 +9,11 @@ pub trait UnaryExpression {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression>;
 }
 
-pub struct Negation {
-    arg : Box<Expression>
+pub struct Negation<'a> {
+    arg : Box<Expression<'a>>
 }
 
-impl UnaryExpression for Negation {
+impl<'a> UnaryExpression for Negation<'a> {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
@@ -31,7 +31,7 @@ impl UnaryExpression for Negation {
     }
 }
 
-impl UnaryFolder for Negation {
+impl<'a> UnaryFolder for Negation<'a> {
     fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
         match c {
             Constant::Integer(i) => Some(Constant::Integer(-i)),
@@ -40,22 +40,22 @@ impl UnaryFolder for Negation {
     }
 }
 
-impl Typed for Negation {
+impl<'a> Typed for Negation<'a> {
     fn get_type(&self) -> Type {self.arg.get_type()}
 }
 
 pub enum ArithmeticOp {
     Add, Sub, Mul, Div
 }
-pub struct Arithmetic {
-    lhs : Box<Expression>,
-    rhs : Box<Expression>,
+pub struct Arithmetic<'a> {
+    lhs : Box<Expression<'a>>,
+    rhs : Box<Expression<'a>>,
     op : ArithmeticOp
 }
 
-impl Arithmetic {
-    pub fn new(lhs : Expression, rhs : Expression, op : ArithmeticOp, cfg : Configuration)
-    -> Option<Expression> {
+impl<'a> Arithmetic<'a> {
+    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : ArithmeticOp, cfg : Configuration)
+    -> Option<Expression<'a>> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -86,15 +86,15 @@ impl Arithmetic {
     }
 }
 
-impl Typed for Arithmetic {
+impl<'a> Typed for Arithmetic<'a> {
     fn get_type(&self) -> Type {self.rhs.get_type()}
 }
 
-pub struct Not {
-    arg : Box<Expression>
+pub struct Not<'a> {
+    arg : Box<Expression<'a>>
 }
 
-impl UnaryExpression for Not {
+impl<'a> UnaryExpression for Not<'a> {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression> {
         match expr {
             Expression::Constant(c) => match Self::fold(c, cfg) {
@@ -113,7 +113,7 @@ impl UnaryExpression for Not {
     }
 }
 
-impl UnaryFolder for Not {
+impl<'a> UnaryFolder for Not<'a> {
     fn fold(c : Constant, _cfg : Configuration) -> Option<Constant> {
         match c {
             Constant::Boolean(b) => Some(Constant::Boolean(!b)),
@@ -122,22 +122,22 @@ impl UnaryFolder for Not {
     }
 }
 
-impl Typed for Not {
+impl<'a> Typed for Not<'a> {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
 pub enum LogicalOp {
     And, Or
 }
-pub struct Logical {
-    lhs : Box<Expression>,
-    rhs : Box<Expression>,
+pub struct Logical<'a> {
+    lhs : Box<Expression<'a>>,
+    rhs : Box<Expression<'a>>,
     op : LogicalOp
 }
 
-impl Logical {
-    pub fn new(lhs : Expression, rhs : Expression, op : LogicalOp, cfg : Configuration)
-    -> Option<Expression> {
+impl<'a> Logical<'a> {
+    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : LogicalOp, cfg : Configuration)
+    -> Option<Expression<'a>> {
         match (lhs, rhs) {
             (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
                 Some(c) => Some(Expression::Constant(c)),
@@ -166,20 +166,70 @@ impl Logical {
     }
 }
 
-impl Typed for Logical {
+impl<'a> Typed for Logical<'a> {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
-pub struct Comparison {
-    pub op : ComparisonOp
+pub struct Comparison<'a> {
+    lhs : Box<Expression<'a>>,
+    rhs : Box<Expression<'a>>,
+    op : ComparisonOp
 }
+
+impl<'a> Comparison<'a> {
+    pub fn new(lhs : Expression<'a>, rhs : Expression<'a>, op : ComparisonOp, cfg : Configuration)
+    -> Option<Expression<'a>> {
+        match (lhs, rhs) {
+            (Expression::Constant(c), Expression::Constant(d)) => match Self::fold(c, d, op, cfg) {
+                Some(c) => Some(Expression::Constant(c)),
+                None => None
+            },
+            (lhs, rhs) => match (lhs.get_type(), rhs.get_type()) {
+                (Type::ScalarType(s), Type::ScalarType(t)) => match (s, t) {
+                    (ScalarType::Boolean, ScalarType::Boolean) => match op {
+                        ComparisonOp::EQ | ComparisonOp::NE => Some(Expression::Comparison(
+                        Comparison{lhs : Box::new(lhs), rhs : Box::new(rhs), op : op})),
+                        _ => None
+                    },
+                    (ScalarType::Integer, ScalarType::Integer) => Some(Expression::Comparison(
+                        Comparison{lhs : Box::new(lhs), rhs : Box::new(rhs), op : op})),
+                    _ => None
+                },
+                _ => None
+            }
+        }
+
+    }
+    pub fn fold(c : Constant, d : Constant, op : ComparisonOp, _cfg : Configuration)
+    -> Option<Constant> {
+        match (c, d) {
+            (Constant::Boolean(c), Constant::Boolean(d)) => match op {
+                ComparisonOp::EQ => Some(Constant::Boolean(c == d)),
+                ComparisonOp::NE => Some(Constant::Boolean(c != d)),
+                _ => None
+            },
+            (Constant::Integer(c), Constant::Integer(d)) => Some(match op {
+                ComparisonOp::EQ => Constant::Boolean(c == d),
+                ComparisonOp::NE => Constant::Boolean(c != d),
+                ComparisonOp::LT => Constant::Boolean(c < d),
+                ComparisonOp::LE => Constant::Boolean(c <= d),
+                ComparisonOp::GT => Constant::Boolean(c > d),
+                ComparisonOp::GE => Constant::Boolean(c >= d),
+            }),
+            _ => None
+        }
+    }
+}
+
 pub enum ComparisonOp {
-    EQ, LT, LEQ, GT, GEQ
+    EQ, NE, LT, LE, GT, GE
 }
 
-pub struct FunctionCall {
-
+pub struct FunctionCall<'a> {
+    function : &'a Function,
+    arguments : Vec<Expression<'a>>
 }
+
 pub enum Constant {
     Integer(i64), // Should be 32 bit, but is reduced based off configuration later
     Boolean(bool)
@@ -194,18 +244,18 @@ impl Typed for Constant {
     }
 }
 
-pub enum Expression {
+pub enum Expression<'a> {
     Constant(Constant),
-    Negation(Negation),
-    Arithmetic(Arithmetic),
-    Not(Not),
-    Logical(Logical),
-    Comparison(Comparison),
-    Variable(Variable),
-    FunctionCall(FunctionCall)
+    Negation(Negation<'a>),
+    Arithmetic(Arithmetic<'a>),
+    Not(Not<'a>),
+    Logical(Logical<'a>),
+    Comparison(Comparison<'a>),
+    Variable(&'a Variable),
+    FunctionCall(FunctionCall<'a>)
 }
 
-impl Typed for Expression {
+impl<'a> Typed for Expression<'a> {
     //TODO: implement
     fn get_type(&self) -> Type {Type::Null}
 }

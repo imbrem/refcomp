@@ -7,5 +7,9 @@ pub struct Variable {
 }
 
 pub struct Function {
+
+}
+
+pub struct Procedure {
     
 }
