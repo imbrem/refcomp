@@ -9,6 +9,7 @@ pub trait UnaryExpression {
     fn new(expr : Expression, cfg : Configuration) -> Option<Expression>;
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Negation<'a> {
     arg : Box<Expression<'a>>
 }
@@ -44,9 +45,12 @@ impl<'a> Typed for Negation<'a> {
     fn get_type(&self) -> Type {self.arg.get_type()}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum ArithmeticOp {
     Add, Sub, Mul, Div
 }
+
+#[derive(Debug, PartialEq)]
 pub struct Arithmetic<'a> {
     lhs : Box<Expression<'a>>,
     rhs : Box<Expression<'a>>,
@@ -90,6 +94,7 @@ impl<'a> Typed for Arithmetic<'a> {
     fn get_type(&self) -> Type {self.rhs.get_type()}
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Not<'a> {
     arg : Box<Expression<'a>>
 }
@@ -126,9 +131,12 @@ impl<'a> Typed for Not<'a> {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum LogicalOp {
     And, Or
 }
+
+#[derive(Debug, PartialEq)]
 pub struct Logical<'a> {
     lhs : Box<Expression<'a>>,
     rhs : Box<Expression<'a>>,
@@ -170,6 +178,7 @@ impl<'a> Typed for Logical<'a> {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
 
+#[derive(Debug, PartialEq)]
 pub struct Comparison<'a> {
     lhs : Box<Expression<'a>>,
     rhs : Box<Expression<'a>>,
@@ -221,10 +230,12 @@ impl<'a> Comparison<'a> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum ComparisonOp {
     EQ, NE, LT, LE, GT, GE
 }
 
+#[derive(Debug, PartialEq)]
 pub struct FunctionCall<'a> {
     function : &'a Function,
     arguments : Vec<Expression<'a>>
@@ -242,6 +253,7 @@ impl<'a> Typed for FunctionCall<'a> {
     fn get_type(&self) -> Type {self.function.get_type()}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub enum Constant {
     Integer(i64), // Should be 32 bit, but is reduced based off configuration later
     Boolean(bool)
@@ -256,6 +268,7 @@ impl Typed for Constant {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Expression<'a> {
     Constant(Constant),
     Negation(Negation<'a>),

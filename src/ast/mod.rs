@@ -8,6 +8,7 @@ trait Callable {
     fn get_arity(&self) -> usize;
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Variable {
     var_type : Type
 }
@@ -22,6 +23,7 @@ impl Typed for Variable {
     fn get_type(&self) -> Type {return self.var_type.clone()}
 }
 
+#[derive(Debug, Eq, PartialEq)]
 pub struct Function {
     arity : u32,
     ret_type : Type
