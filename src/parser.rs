@@ -20,8 +20,8 @@ fn get_logical_precedence_climber() -> PrecClimber<Rule> {
 }
 
 lazy_static! {
-    static ref BINARY_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_binary_precedence_climber();
-    static ref LOGICAL_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_logical_precedence_climber();
+    pub static ref BINARY_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_binary_precedence_climber();
+    pub static ref LOGICAL_PRECEDENCE_CLIMBER : PrecClimber<Rule> = get_logical_precedence_climber();
 }
 
 #[cfg(test)]

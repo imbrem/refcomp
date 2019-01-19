@@ -1,6 +1,8 @@
 use super::{Variable, Function, Callable};
 use super::types::{Type, Typed, ScalarType};
 use crate::Configuration;
+use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER, CSC488Parser};
+use pest::iterators::{Pair, Pairs};
 use std::rc::Rc;
 
 pub trait UnaryFolder {
@@ -283,6 +285,12 @@ pub enum Expression {
     Comparison(Comparison),
     Variable(Rc<Variable>),
     FunctionCall(FunctionCall)
+}
+
+impl Expression {
+    pub fn from_pair(pair : Pair<Rule>) -> Option<Expression> {
+        None
+    }
 }
 
 impl Typed for Expression {
