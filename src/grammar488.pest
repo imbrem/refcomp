@@ -1,0 +1,146 @@
+// Comments
+WHITESPACE = _{" "|"\t"|NEWLINE}
+COMMENT = _{single_line_comment | multiline_comment}
+single_line_comment = _{"//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE?}
+multiline_comment = _{"/*" ~ (!"*/" ~ ANY)* ~ "*/"}
+
+// Keywords
+kw_if = _{"if"}
+kw_else = _{"else"}
+kw_while = _{"while"}
+kw_repeat = _{"repeat"}
+kw_until = _{"until"}
+kw_break = _{"break"}
+kw_return = _{"return"}
+kw_print = _{"print"}
+kw_input = _{"input"}
+kw_var = _{"var"}
+kw_func = _{"func"}
+kw_true = _{"true"}
+kw_false = _{"false"}
+kw_not = _{"not"}
+kw_and = _{"and"}
+kw_or = _{"or"}
+
+keyword = {
+    kw_if | kw_else | kw_while | kw_repeat | kw_until | kw_break | kw_return | kw_print | kw_input
+    | kw_var | kw_func | kw_true | kw_false | kw_not | kw_and | kw_or
+}
+
+// Program
+program = {bare_scope}
+bare_scope = {(declarations ~ statements?) | statements}
+scope = {"{" ~ bare_scope ~ "}"}
+
+// Statements
+assignment = {variable ~ "=" ~ expression}
+else_statement = {kw_else ~ scope}
+if_statement = {kw_if ~ expression ~ scope}
+conditional = {if_statement ~ (kw_else ~ if_statement)*  ~ else_statement?}
+while_loop = {kw_while ~ expression ~ scope}
+repeat_loop = {kw_repeat ~ scope ~ kw_until ~ expression}
+break_loop = {kw_break ~ integer?}
+return_statement = {kw_return ~ expression?}
+print_statement = {kw_print ~ output}
+input_statement = {kw_input ~ input}
+procedure_call = {procedure_name ~ "(" ~ arguments? ~ ")"}
+
+statement = _{
+    assignment |
+    conditional |
+    while_loop |
+    repeat_loop |
+    break_loop |
+    return_statement |
+    print_statement |
+    input_statement |
+    procedure_call
+}
+statements = {statement+}
+
+// Declarations
+variable_declaration = {kw_var ~ variable_names ~ compound_type}
+procedure_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters? ~ ")" ~ scalar_type? ~ scope}
+declaration = _{variable_declaration | procedure_declaration}
+declarations = {declaration+}
+
+// Expressions
+primary_expression = {
+    integer
+    | ("(" ~ expression ~ ")")
+    | ("(" ~ ternary_expression ~ ")")
+    | function_call
+    | kw_true
+    | kw_false
+    | identifier
+    | negation_expression
+}
+ternary_expression = {"(" ~ expression ~ kw_if ~ expression ~ kw_else ~ expression ~ ")"}
+function_call = {identifier ~ "(" ~ arguments? ~ ")"}
+negation_expression = {op_minus ~ expression}
+not_expression = {kw_not ~ expression}
+
+op_plus = {"+"}
+op_minus = {"-"}
+op_times = {"*"}
+op_divides = {"/"}
+
+binary_operator = _{
+    op_plus | op_minus | op_times | op_divides
+}
+binary_expression = {
+    primary_expression ~ (binary_operator ~ primary_expression)*
+}
+logical_expression = _{
+    binary_expression |
+    not_expression
+}
+logical_operator = _{
+    kw_or | kw_and
+}
+expression = {
+    logical_expression ~ (logical_operator ~ logical_expression)*
+}
+
+
+// Components
+variable_names = {
+    variable_name ~ ("," ~ variable_name)*
+}
+scalar_type = {"integer" | "boolean"}
+array_bounds = {"[" ~ bound ~ "]"}
+bound = _{integer}
+array_type = {array_bounds+ ~ scalar_type}
+compound_type = _{scalar_type | array_type}
+
+parameter = {
+    parameter_names ~ scalar_type
+}
+parameters = {
+    parameter ~ ("," ~ parameter)*
+}
+parameter_names = {
+    parameter_name ~ ("," ~ parameter_name)*
+}
+arguments = {
+    expression ~ ("," ~ expression)*
+}
+single_output = {
+    expression | text | "newline"
+}
+output = {
+    single_output ~ ("," ~ single_output)*
+}
+input = {
+    variable ~ ("," ~ variable)*
+}
+
+variable = _{variable_name}
+variable_name = _{identifier}
+procedure_name = _{identifier}
+parameter_name = _{identifier}
+array_name = _{identifier}
+identifier = {!keyword ~ ("_"|ASCII_ALPHA) ~ ("_"|ASCII_ALPHANUMERIC)*}
+integer = {"0"|(ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
+text = {"\"" ~ string_text ~ "\""}
+string_text = {(!NEWLINE ~ ASCII)*}
