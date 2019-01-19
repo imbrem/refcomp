@@ -299,3 +299,21 @@ impl Typed for Expression {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn integer_expressions_are_folded_correctly() {
+        assert_eq!(
+            Arithmetic::new(
+                Expression::Constant(Constant::Integer(1)),
+                Expression::Constant(Constant::Integer(1)),
+                ArithmeticOp::Add,
+                Configuration{}
+            ),
+            Some(Expression::Constant(Constant::Integer(2)))
+        )
+    }
+}
