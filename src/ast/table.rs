@@ -77,4 +77,7 @@ pub struct SymbolTable {
 
 impl SymbolTable {
     pub fn new() -> SymbolTable {SymbolTable{symbols : SymbolMap::new()}}
+    pub fn with_init(symbols : SymbolMap<String, Symbol>) -> SymbolTable {
+        SymbolTable{symbols : symbols}
+    }
 }
