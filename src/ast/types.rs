@@ -1,3 +1,9 @@
+use std::rc::Rc;
+
+pub trait Typed {
+    fn get_type(&self) -> Type;
+}
+
 pub enum ScalarType {
     Integer,
     Boolean
@@ -8,5 +14,7 @@ pub struct ArrayType {
 }
 pub enum Type {
     ScalarType(ScalarType),
-    ArrayType(ArrayType)
+    ArrayType(Rc<ArrayType>),
+    Null,
+    Void
 }

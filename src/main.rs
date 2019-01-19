@@ -8,6 +8,10 @@ extern crate lazy_static;
 pub mod parser;
 pub mod ast;
 
+pub struct Configuration {
+    
+}
+
 fn main() {
     println!("Hello world!");
 }
