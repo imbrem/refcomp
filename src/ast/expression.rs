@@ -289,7 +289,8 @@ pub enum Expression {
 
 impl Expression {
 
-    fn parse_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+    fn parse_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration)
+    -> Option<Expression> {
         if pair.as_rule() != Rule::primary_expression {return None;}
         let pair = pair.into_inner().next().unwrap();
         match pair.as_rule() {
@@ -308,7 +309,8 @@ impl Expression {
         }
     }
 
-    fn parse_binary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+    fn parse_binary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration)
+    -> Option<Expression> {
         let parse_primary = |pair : Pair<Rule>| {Self::parse_primary(pair, sym, cfg)};
         let merge_arith = |lhs : Option<Expression>, op : Pair<Rule>, rhs : Option<Expression>|
         -> Option<Expression> {
@@ -326,7 +328,8 @@ impl Expression {
         BINARY_PRECEDENCE_CLIMBER.climb(pair.into_inner(), parse_primary, merge_arith)
     }
 
-    fn parse_logical_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration) -> Option<Expression> {
+    fn parse_logical_primary(pair : Pair<Rule>, sym : &SymbolTable, cfg : &Configuration)
+    -> Option<Expression> {
         match pair.as_rule() {
             Rule::comparison_expression => {
                 let mut pairs = pair.into_inner();
