@@ -231,6 +231,10 @@ impl Comparison {
     }
 }
 
+impl Typed for Comparison {
+    fn get_type(&self) -> Type {return Type::ScalarType(ScalarType::Boolean)}
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ComparisonOp {
     EQ, NE, LT, LE, GT, GE
@@ -282,6 +286,16 @@ pub enum Expression {
 }
 
 impl Typed for Expression {
-    //TODO: implement
-    fn get_type(&self) -> Type {Type::Null}
+    fn get_type(&self) -> Type {
+        match self {
+            Expression::Constant(c) => c.get_type(),
+            Expression::Negation(n) => n.get_type(),
+            Expression::Arithmetic(a) => a.get_type(),
+            Expression::Not(n) => n.get_type(),
+            Expression::Logical(l) => l.get_type(),
+            Expression::Comparison(c) => c.get_type(),
+            Expression::Variable(v) => v.get_type(),
+            Expression::FunctionCall(f) => f.get_type()
+        }
+    }
 }
