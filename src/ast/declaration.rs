@@ -1,6 +1,7 @@
 use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped};
 use super::statement::{Scope};
 use super::types::{parse_type};
+use super::{parse_bare_scope};
 use crate::parser::{Rule};
 use pest::iterators::Pair;
 use std::rc::Rc;
@@ -66,8 +67,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
         Some(t) => {
             let mut func = Function::new(name, parameters, t);
             func.enter_scope(sym);
-            //TODO: parse scope here
-            let scope = Scope::empty();
+            let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
             func.implement(scope);
             func.leave_scope(sym);
             Some(Declaration::Function(Rc::new(func)))
@@ -75,8 +75,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
         None => {
             let mut proc = Procedure::new(name, parameters);
             proc.enter_scope(sym);
-            //TODO: parse scope here
-            let scope = Scope::empty();
+            let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
             proc.implement(scope);
             proc.leave_scope(sym);
             Some(Declaration::Procedure(Rc::new(proc)))
