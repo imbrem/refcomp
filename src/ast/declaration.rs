@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Procedure, SymbolTable, Scoped};
+use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped};
 use super::statement::{Scope};
 use super::types::{parse_type};
 use crate::parser::{Rule};
@@ -7,8 +7,31 @@ use std::rc::Rc;
 
 pub enum Declaration {
     Variable(Vec<Rc<Variable>>),
-    Function(Function),
-    Procedure(Procedure)
+    Function(Rc<Function>),
+    Procedure(Rc<Procedure>)
+}
+
+impl Scoped for Declaration {
+    fn enter_scope(&self, sym: &mut SymbolTable) {match self {
+            Declaration::Variable(vars) => for var in vars.iter() {
+                sym.define(Symbol::Variable(var.clone()))},
+            Declaration::Function(f) => sym.define(Symbol::Function(f.clone())),
+            Declaration::Procedure(p) => sym.define(Symbol::Procedure(p.clone()))
+    }}
+    fn leave_scope(&self, sym : &mut SymbolTable) {match self {
+            Declaration::Variable(vars) => for var in vars.iter() {sym.undef(var.get_name());},
+            Declaration::Function(f) => {sym.undef(f.get_name());},
+            Declaration::Procedure(p) => {sym.undef(p.get_name());}
+    }}
+}
+
+impl Scoped for Vec<Declaration> {
+    fn enter_scope(&self, sym : &mut SymbolTable) {
+        for decl in self.iter() {decl.enter_scope(sym);}
+    }
+    fn leave_scope(&self, sym : &mut SymbolTable) {
+        for decl in self.iter().rev() {decl.leave_scope(sym);}
+    }
 }
 
 fn parse_variable_declaration(pair : Pair<Rule>) -> Option<Declaration> {
@@ -47,7 +70,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
             let scope = Scope::empty();
             func.implement(scope);
             func.leave_scope(sym);
-            Some(Declaration::Function(func))
+            Some(Declaration::Function(Rc::new(func)))
         },
         None => {
             let mut proc = Procedure::new(name, parameters);
@@ -56,7 +79,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
             let scope = Scope::empty();
             proc.implement(scope);
             proc.leave_scope(sym);
-            Some(Declaration::Procedure(proc))
+            Some(Declaration::Procedure(Rc::new(proc)))
         },
     }
 }
@@ -119,7 +142,7 @@ mod test {
             &mut sym
         ).unwrap();
         match decl {
-            Declaration::Procedure(p) => assert_eq!(p, target_procedure),
+            Declaration::Procedure(p) => assert_eq!(*p, target_procedure),
             _ => panic!("Didn't parse a procedure")
         }
     }

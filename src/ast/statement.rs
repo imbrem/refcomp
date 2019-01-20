@@ -1,6 +1,6 @@
 use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable};
 use super::expression::{Expression, ArrayIndex};
-use super::declaration::{Declaration};
+use super::declaration::Declaration;
 use super::parse_bare_scope;
 use crate::parser::Rule;
 use pest::iterators::Pair;
@@ -78,8 +78,8 @@ impl Scope {
         for decl in declarations {
             match decl {
                 Declaration::Variable(vars) => for var in vars {result.variables.push(var)},
-                Declaration::Function(f) => result.functions.push(Rc::new(f)),
-                Declaration::Procedure(p) => result.procedures.push(Rc::new(p))
+                Declaration::Function(f) => result.functions.push(f),
+                Declaration::Procedure(p) => result.procedures.push(p)
             }
         }
         result

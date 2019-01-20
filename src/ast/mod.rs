@@ -4,10 +4,10 @@ pub mod declaration;
 pub mod expression;
 pub mod table;
 
-use table::{SymbolTable};
-use statement::{Scope};
-use declaration::{parse_declaration};
-use statement::{parse_statement};
+use self::table::{SymbolTable, Scoped};
+use self::statement::{Scope};
+use self::declaration::{parse_declaration};
+use self::statement::{parse_statement};
 use crate::parser::Rule;
 use pest::iterators::Pair;
 
@@ -24,10 +24,12 @@ pub fn parse_bare_scope(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Sco
         Some(ds) => ds.into_inner().map(|d| parse_declaration(d, sym).unwrap()).collect(),
         None => Vec::new()
     };
+    declarations.enter_scope(sym);
     let statements = match statements {
         Some(ss) => ss.into_inner().map(|s| parse_statement(s, sym).unwrap()).collect(),
         None => Vec::new()
     };
+    declarations.leave_scope(sym);
     Some(Scope::new(statements, declarations))
 }
 
