@@ -10,12 +10,8 @@ use declaration::{parse_declaration};
 use crate::parser::Rule;
 use pest::iterators::Pair;
 
-pub fn parse_bare_scope(mut pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Scope> {
-    match pair.as_rule() {
-        Rule::scope => {pair = pair.into_inner().next().unwrap()},
-        Rule::bare_scope => {},
-        _ => {return None}
-    };
+pub fn parse_bare_scope(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Scope> {
+    if pair.as_rule() != Rule::bare_scope {return None}
     let mut pairs = pair.into_inner();
     let first = pairs.next().unwrap();
     let (declarations, statements) = match first.as_rule() {
