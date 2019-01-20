@@ -56,7 +56,8 @@ statement = _{
     return_statement |
     print_statement |
     input_statement |
-    procedure_call
+    procedure_call |
+    scope
 }
 statements = {statement+}
 

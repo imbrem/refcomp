@@ -1,6 +1,9 @@
 use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable};
 use super::expression::{Expression, ArrayIndex};
 use super::declaration::{Declaration};
+use super::parse_bare_scope;
+use crate::parser::Rule;
+use pest::iterators::Pair;
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -13,6 +16,15 @@ pub enum AssignmentDestination {
 pub struct Assignment {
     pub destination : AssignmentDestination,
     pub value : Expression
+}
+
+impl Assignment {
+    pub fn to_variable(var : Rc<Variable>, val : Expression) -> Assignment {
+        Assignment{destination : AssignmentDestination::Variable(var), value : val}
+    }
+    pub fn to_index(arr : ArrayIndex, val : Expression) -> Assignment {
+        Assignment{destination : AssignmentDestination::ArrayIndex(arr), value : val}
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -126,4 +138,51 @@ pub enum OutputElement {
     Expression(Expression),
     Text(String),
     Newline
+}
+
+pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Statement> {
+    match pair.as_rule() {
+        Rule::assignment => {
+            let mut pairs = pair.into_inner();
+            let variable = pairs.next().unwrap();
+            let expression = match Expression::from_pair(pairs.next().unwrap(), sym) {
+                Some(exp) => exp,
+                None => {return None}
+            };
+            match variable.as_rule() {
+                Rule::array_index => panic!("Array index assignment not yet implemented!"),
+                Rule::identifier => match sym.dereference(variable.as_str()) {
+                    Some(Symbol::Variable(v)) =>
+                        Some(Statement::Assignment(Assignment::to_variable(v, expression))),
+                    _ => None
+                },
+                _ => None
+            }
+        },
+        Rule::conditional => {
+            panic!("Conditionals are not yet implemented!")
+        },
+        Rule::while_loop => {
+            panic!("While loops are not yet implemented!")
+        },
+        Rule::repeat_loop => {
+            panic!("Repetition loops are not yet implemented!")
+        },
+        Rule::return_statement => {
+            panic!("Return statements are not yet implemented!")
+        },
+        Rule::print_statement => {
+            panic!("Printing is not yet implemented!")
+        },
+        Rule::input_statement => {
+            panic!("Input is not yet implemented!")
+        },
+        Rule::procedure_call => {
+            panic!("Procedure calls are not yet implemented!")
+        },
+        Rule::scope => Some(
+            Statement::Scope(parse_bare_scope(pair.into_inner().next().unwrap(), sym).unwrap())
+        ),
+        _ => None
+    }
 }
