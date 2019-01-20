@@ -1,4 +1,6 @@
 use std::rc::Rc;
+use crate::parser::Rule;
+use pest::iterators::Pair;
 
 pub trait Typed {
     fn get_type(&self) -> Type;
@@ -28,4 +30,32 @@ pub enum Type {
     ArrayType(Rc<ArrayType>),
     Null,
     Void
+}
+
+pub fn parse_scalar_type(pair : Pair<Rule>) -> Option<ScalarType> {
+    match pair.as_rule() {
+        Rule::scalar_type => match pair.into_inner().next().unwrap().as_rule() {
+            Rule::kw_integer => Some(ScalarType::Integer),
+            Rule::kw_boolean => Some(ScalarType::Boolean),
+            _ => unreachable!()
+        },
+        _ => None
+    }
+}
+
+pub fn parse_type(pair : Pair<Rule>) -> Option<Type> {
+    match pair.as_rule() {
+        Rule::scalar_type => Some(Type::ScalarType(parse_scalar_type(pair).unwrap())),
+        Rule::array_type => {
+            let mut pairs = pair.into_inner();
+            let dims = pairs.next().unwrap().into_inner().map(
+                |p| p.into_inner().next().unwrap().as_str().parse::<u32>().unwrap()
+            ).collect();
+            Some(Type::ArrayType(Rc::new(ArrayType::new(
+                parse_scalar_type(pairs.next().unwrap()).unwrap(),
+                dims
+            ))))
+        },
+        _ => None
+    }
 }

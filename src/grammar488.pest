@@ -21,10 +21,12 @@ kw_false = {"false"}
 kw_not = _{"not"}
 kw_and = {"and"}
 kw_or = {"or"}
+kw_integer = {"integer"}
+kw_boolean = {"boolean"}
 
 keyword = {
     kw_if | kw_else | kw_while | kw_repeat | kw_until | kw_break | kw_return | kw_print | kw_input
-    | kw_var | kw_func | kw_true | kw_false | kw_not | kw_and | kw_or
+    | kw_var | kw_func | kw_true | kw_false | kw_not | kw_and | kw_or | kw_integer | kw_boolean
 }
 
 // Program
@@ -60,7 +62,8 @@ statements = {statement+}
 
 // Declarations
 variable_declaration = {kw_var ~ variable_names ~ compound_type}
-procedure_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters? ~ ")" ~ scalar_type? ~ scope}
+function_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters ~ ")" ~ scalar_type ~ scope}
+procedure_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters ~ ")" ~ scope}
 declaration = _{variable_declaration | procedure_declaration}
 declarations = {declaration+}
 
@@ -122,17 +125,18 @@ expression = {
 variable_names = {
     variable_name ~ ("," ~ variable_name)*
 }
-scalar_type = {"integer" | "boolean"}
-array_bounds = {"[" ~ bound ~ "]"}
+scalar_type = {kw_integer | kw_boolean}
+array_bound = {"[" ~ bound ~ "]"}
+array_bounds = {array_bound+}
 bound = _{integer}
-array_type = {array_bounds+ ~ scalar_type}
+array_type = {array_bounds ~ scalar_type}
 compound_type = _{scalar_type | array_type}
 
 parameter = {
     parameter_names ~ scalar_type
 }
 parameters = {
-    parameter ~ ("," ~ parameter)*
+    (parameter ~ ("," ~ parameter)*)?
 }
 parameter_names = {
     parameter_name ~ ("," ~ parameter_name)*
