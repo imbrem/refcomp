@@ -65,8 +65,10 @@ impl Typed for Function {
 impl Scoped for Function {
     fn enter_scope(&self, sym: &mut SymbolTable) {
         for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
+        if let Some(s) = &self.fn_impl {s.enter_scope(sym);}
     }
     fn leave_scope(&self, sym : &mut SymbolTable) {
+        if let Some(s) = &self.fn_impl {s.leave_scope(sym);}
         for arg in &self.args {sym.undef(arg.get_name());}
     }
 }
@@ -95,8 +97,10 @@ impl Callable for Procedure {
 impl Scoped for Procedure {
     fn enter_scope(&self, sym: &mut SymbolTable) {
         for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
+        if let Some(s) = &self.pr_impl {s.enter_scope(sym);}
     }
     fn leave_scope(&self, sym : &mut SymbolTable) {
+    if let Some(s) = &self.pr_impl {s.leave_scope(sym);}
         for arg in &self.args {sym.undef(arg.get_name());}
     }
 }
