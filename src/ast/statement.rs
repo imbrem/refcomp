@@ -49,6 +49,12 @@ pub struct Scope {
     pub statements : Vec<Statement>
 }
 
+impl Scope {
+    pub fn empty() -> Scope {
+        Scope{statements : vec![]}
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Assignment(Assignment),

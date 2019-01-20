@@ -17,6 +17,12 @@ impl Variable {
     pub fn new(name : String, var_type : Type) -> Variable {
         Variable{name : name, var_type : var_type}
     }
+    pub fn integer(name : String) -> Variable {
+        Self::new(name, Type::integer())
+    }
+    pub fn boolean(name : String) -> Variable {
+        Self::new(name, Type::boolean())
+    }
     pub fn get_name(&self) -> &str {&self.name}
 }
 

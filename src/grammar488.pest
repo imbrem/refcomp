@@ -62,8 +62,8 @@ statements = {statement+}
 
 // Declarations
 variable_declaration = {kw_var ~ variable_names ~ compound_type}
-function_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters ~ ")" ~ scalar_type ~ scope}
-procedure_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters ~ ")" ~ scope}
+procedure_declaration = {kw_func ~ procedure_name ~ "(" ~ parameters ~ ")" ~ optional_type ~ scope}
+optional_type = {scalar_type?}
 declaration = _{variable_declaration | procedure_declaration}
 declarations = {declaration+}
 

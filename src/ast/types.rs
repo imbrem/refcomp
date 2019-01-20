@@ -32,6 +32,11 @@ pub enum Type {
     Void
 }
 
+impl Type {
+    pub fn integer() -> Type {Type::ScalarType(ScalarType::Integer)}
+    pub fn boolean() -> Type {Type::ScalarType(ScalarType::Boolean)}
+}
+
 pub fn parse_scalar_type(pair : Pair<Rule>) -> Option<ScalarType> {
     match pair.as_rule() {
         Rule::scalar_type => match pair.into_inner().next().unwrap().as_rule() {
@@ -55,6 +60,10 @@ pub fn parse_type(pair : Pair<Rule>) -> Option<Type> {
                 parse_scalar_type(pairs.next().unwrap()).unwrap(),
                 dims
             ))))
+        },
+        Rule::optional_type => match pair.into_inner().next() {
+                Some(t) => parse_type(t),
+                None => None
         },
         _ => None
     }
