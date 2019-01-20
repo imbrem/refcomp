@@ -7,6 +7,11 @@ pub trait Callable {
     fn get_arity(&self) -> usize;
 }
 
+pub trait Scoped {
+    fn enter_scope(&self, sym : &mut SymbolTable);
+    fn leave_scope(&self, sym : &mut SymbolTable);
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct Variable {
     var_type : Type,
@@ -39,11 +44,13 @@ pub struct Function {
 }
 
 impl Function {
-    pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type, fn_impl : Scope)
+    pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type)
     -> Function {Function{
-        name : name, args : args, ret_type : ret_type,
-        fn_impl : Some(fn_impl)
+        name : name, args : args, ret_type : ret_type, fn_impl : None
     }}
+    pub fn implement(&mut self, scope : Scope) {
+        self.fn_impl = Some(scope);
+    }
     pub fn get_name(&self) -> &str {&self.name}
 }
 
@@ -55,6 +62,15 @@ impl Typed for Function {
     fn get_type(&self) -> Type {self.ret_type.clone()}
 }
 
+impl Scoped for Function {
+    fn enter_scope(&self, sym: &mut SymbolTable) {
+        for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
+    }
+    fn leave_scope(&self, sym : &mut SymbolTable) {
+        for arg in &self.args {sym.undef(arg.get_name());}
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Procedure {
     name : String,
@@ -63,14 +79,26 @@ pub struct Procedure {
 }
 
 impl Procedure {
-    pub fn new(name : String, args : Vec<Rc<Variable>>, pr_impl : Scope) -> Procedure {
-        Procedure{name : name, args : args, pr_impl : Some(pr_impl)}
+    pub fn new(name : String, args : Vec<Rc<Variable>>) -> Procedure {
+        Procedure{name : name, args : args, pr_impl : None}
+    }
+    pub fn implement(&mut self, scope : Scope) {
+        self.pr_impl = Some(scope);
     }
     pub fn get_name(&self) -> &str {&self.name}
 }
 
 impl Callable for Procedure {
     fn get_arity(&self) -> usize {self.args.len()}
+}
+
+impl Scoped for Procedure {
+    fn enter_scope(&self, sym: &mut SymbolTable) {
+        for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
+    }
+    fn leave_scope(&self, sym : &mut SymbolTable) {
+        for arg in &self.args {sym.undef(arg.get_name());}
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
@@ -95,24 +123,33 @@ impl Symbol {
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct SymbolTable {
-    symbols : SymbolMap<String, Symbol>
+    symbols : SymbolMap<String, Vec<Symbol>>
 }
 
 impl SymbolTable {
     pub fn new() -> SymbolTable {SymbolTable{symbols : SymbolMap::new()}}
-    pub fn with_init(symbols : SymbolMap<String, Symbol>) -> SymbolTable {
+    pub fn with_init(symbols : SymbolMap<String, Vec<Symbol>>) -> SymbolTable {
         SymbolTable{symbols : symbols}
     }
     pub fn dereference(&self, symbol : &str) -> Option<Symbol> {
         match self.symbols.get(symbol) {
-            Some(r) => Some(r.clone()),
+            Some(v) => match v.last() {
+                Some(r) => Some(r.clone()),
+                None => None
+            },
             None => None
         }
     }
-    pub fn define(&mut self, symbol : Symbol) -> Option<Symbol> {
+    pub fn define(&mut self, symbol : Symbol) {
         self.reference(symbol.get_name().to_string(), symbol)
     }
-    pub fn reference(&mut self, name : String, symbol : Symbol) -> Option<Symbol> {
-        self.symbols.insert(name, symbol)
+    pub fn reference(&mut self, name : String, symbol : Symbol) {
+        self.symbols.entry(name).or_insert(Vec::with_capacity(1)).push(symbol);
+    }
+    pub fn undef(&mut self, name : &str) -> Option<Symbol> {
+        match self.symbols.get_mut(name) {
+            Some(v) => v.pop(),
+            None => None
+        }
     }
 }

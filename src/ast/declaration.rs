@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Procedure, SymbolTable};
+use super::table::{Variable, Function, Procedure, SymbolTable, Scoped};
 use super::statement::{Scope};
 use super::types::{parse_type};
 use crate::parser::{Rule};
@@ -40,8 +40,24 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
     let rtype = parse_type(pairs.next().unwrap());
     let scope = pairs.next().unwrap(); //TODO: parse
     match rtype {
-        Some(t) => Some(Declaration::Function(Function::new(name, parameters, t, Scope::empty()))),
-        None => Some(Declaration::Procedure(Procedure::new(name, parameters, Scope::empty())))
+        Some(t) => {
+            let mut func = Function::new(name, parameters, t);
+            func.enter_scope(sym);
+            //TODO: parse scope here
+            let scope = Scope::empty();
+            func.implement(scope);
+            func.leave_scope(sym);
+            Some(Declaration::Function(func))
+        },
+        None => {
+            let mut proc = Procedure::new(name, parameters);
+            proc.enter_scope(sym);
+            //TODO: parse scope here
+            let scope = Scope::empty();
+            proc.implement(scope);
+            proc.leave_scope(sym);
+            Some(Declaration::Procedure(proc))
+        },
     }
 }
 
@@ -83,14 +99,14 @@ mod test {
 
     #[test]
     fn procedure_and_function_declarations_parse_properly() {
-        let target_procedure = Procedure::new(
+        let mut target_procedure = Procedure::new(
             "my_procedure".to_string(),
             vec![
                 Rc::new(Variable::integer("x".to_string())),
                 Rc::new(Variable::integer("y".to_string())),
-                Rc::new(Variable::boolean("flag".to_string()))],
-            Scope::empty()
+                Rc::new(Variable::boolean("flag".to_string()))]
         );
+        target_procedure.implement(Scope::empty());
         let mut sym = SymbolTable::new();
         let decl = parse_declaration(
             CSC488Parser::parse(Rule::declaration,
