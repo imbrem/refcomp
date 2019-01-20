@@ -140,25 +140,27 @@ pub enum OutputElement {
     Newline
 }
 
+fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Option<Statement> {
+    let mut pairs = pair.into_inner();
+    let variable = pairs.next().unwrap();
+    let expression = match Expression::from_pair(pairs.next().unwrap(), sym) {
+        Some(exp) => exp,
+        None => {return None}
+    };
+    match variable.as_rule() {
+        Rule::array_index => panic!("Array index assignment not yet implemented!"),
+        Rule::identifier => match sym.dereference(variable.as_str()) {
+            Some(Symbol::Variable(v)) =>
+                Some(Statement::Assignment(Assignment::to_variable(v, expression))),
+            _ => None
+        },
+        _ => None
+    }
+}
+
 pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Statement> {
     match pair.as_rule() {
-        Rule::assignment => {
-            let mut pairs = pair.into_inner();
-            let variable = pairs.next().unwrap();
-            let expression = match Expression::from_pair(pairs.next().unwrap(), sym) {
-                Some(exp) => exp,
-                None => {return None}
-            };
-            match variable.as_rule() {
-                Rule::array_index => panic!("Array index assignment not yet implemented!"),
-                Rule::identifier => match sym.dereference(variable.as_str()) {
-                    Some(Symbol::Variable(v)) =>
-                        Some(Statement::Assignment(Assignment::to_variable(v, expression))),
-                    _ => None
-                },
-                _ => None
-            }
-        },
+        Rule::assignment => parse_assignment(pair, sym),
         Rule::conditional => {
             panic!("Conditionals are not yet implemented!")
         },
