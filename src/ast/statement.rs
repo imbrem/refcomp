@@ -162,8 +162,8 @@ fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Option<Statement> 
     let mut pairs = pair.into_inner();
     let variable = pairs.next().unwrap();
     let expression = match Expression::from_pair(pairs.next().unwrap(), sym) {
-        Some(exp) => exp,
-        None => {return None}
+        Ok(exp) => exp,
+        _ => {return None}
     };
     match variable.as_rule() {
         Rule::array_index => panic!("Array index assignment not yet implemented!"),
