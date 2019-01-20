@@ -27,22 +27,22 @@ impl Typed for Variable {
 #[derive(Debug, PartialEq)]
 pub struct Function {
     name : String,
-    arity : u32,
+    args : Vec<Rc<Variable>>,
     ret_type : Type,
     fn_impl : Option<Scope>
 }
 
 impl Function {
-    pub fn new(name : String, arity : u32, ret_type : Type, fn_impl : Scope)
+    pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type, fn_impl : Scope)
     -> Function {Function{
-        name : name, arity : arity, ret_type : ret_type,
+        name : name, args : args, ret_type : ret_type,
         fn_impl : Some(fn_impl)
     }}
     pub fn get_name(&self) -> &str {&self.name}
 }
 
 impl Callable for Function {
-    fn get_arity(&self) -> usize {self.arity as usize}
+    fn get_arity(&self) -> usize {self.args.len()}
 }
 
 impl Typed for Function {
@@ -52,19 +52,19 @@ impl Typed for Function {
 #[derive(Debug, PartialEq)]
 pub struct Procedure {
     name : String,
-    arity : u32,
+    args : Vec<Rc<Variable>>,
     pr_impl : Option<Scope>
 }
 
 impl Procedure {
-    pub fn new(name : String, arity : u32, pr_impl : Scope) -> Procedure {
-        Procedure{name : name, arity : arity, pr_impl : Some(pr_impl)}
+    pub fn new(name : String, args : Vec<Rc<Variable>>, pr_impl : Scope) -> Procedure {
+        Procedure{name : name, args : args, pr_impl : Some(pr_impl)}
     }
     pub fn get_name(&self) -> &str {&self.name}
 }
 
 impl Callable for Procedure {
-    fn get_arity(&self) -> usize {self.arity as usize}
+    fn get_arity(&self) -> usize {self.args.len()}
 }
 
 #[derive(Clone, PartialEq, Debug)]
