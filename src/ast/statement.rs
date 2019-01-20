@@ -1,5 +1,6 @@
 use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable};
 use super::expression::{Expression, ArrayIndex};
+use super::declaration::{Declaration};
 use std::rc::Rc;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,6 +54,24 @@ pub struct Scope {
 }
 
 impl Scope {
+    pub fn new(statements : Vec<Statement>, declarations : Vec<Declaration>) -> Scope {
+        let mut result = {
+            Scope{
+                variables : vec![],
+                functions : vec![],
+                procedures : vec![],
+                statements : statements
+            }
+        };
+        for decl in declarations {
+            match decl {
+                Declaration::Variable(vars) => for var in vars {result.variables.push(var)},
+                Declaration::Function(f) => result.functions.push(Rc::new(f)),
+                Declaration::Procedure(p) => result.procedures.push(Rc::new(p))
+            }
+        }
+        result
+    }
     pub fn empty() -> Scope {
         Scope{
             variables : vec![],
