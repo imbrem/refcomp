@@ -84,6 +84,24 @@ impl Scope {
         }
         result
     }
+    pub fn new_from_symbols(statements : Vec<Statement>, symbols : Vec<Symbol>) -> Scope {
+        let mut result = {
+            Scope{
+                variables : vec![],
+                functions : vec![],
+                procedures : vec![],
+                statements : statements
+            }
+        };
+        for sym in symbols {
+            match sym {
+                Symbol::Variable(v) => result.variables.push(v),
+                Symbol::Function(f) => result.functions.push(f),
+                Symbol::Procedure(p) => result.procedures.push(p)
+            }
+        }
+        result
+    }
     pub fn empty() -> Scope {
         Scope{
             variables : vec![],
