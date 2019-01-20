@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Procedure};
+use super::table::{Variable, Function, Procedure, SymbolTable};
 use super::statement::{Scope};
 use super::types::{parse_type};
 use crate::parser::{Rule};
@@ -23,7 +23,7 @@ fn parse_variable_declaration(pair : Pair<Rule>) -> Option<Declaration> {
     ))
 }
 
-fn parse_procedure_declaration(pair : Pair<Rule>) -> Option<Declaration> {
+fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Declaration> {
     if pair.as_rule() != Rule::procedure_declaration {return None;}
     let mut pairs = pair.into_inner();
     let name = pairs.next().unwrap().as_str().to_string();
@@ -45,10 +45,10 @@ fn parse_procedure_declaration(pair : Pair<Rule>) -> Option<Declaration> {
     }
 }
 
-pub fn parse_declaration(pair : Pair<Rule>) -> Option<Declaration> {
+pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Declaration> {
     match pair.as_rule() {
         Rule::variable_declaration => parse_variable_declaration(pair),
-        Rule::procedure_declaration => parse_procedure_declaration(pair),
+        Rule::procedure_declaration => parse_procedure_declaration(pair, sym),
         _ => None
     }
 }
@@ -64,9 +64,11 @@ mod test {
     #[test]
     fn variable_declarations_parse_properly() {
         let vtype = Type::ArrayType(Rc::new(ArrayType::new(ScalarType::Integer, vec![3])));
+        let mut sym = SymbolTable::new();
         let decl = parse_declaration(
             CSC488Parser::parse(Rule::declaration, "var u, v [3] integer")
-            .unwrap().next().unwrap()
+            .unwrap().next().unwrap(),
+            &mut sym
         ).unwrap();
         match decl {
             Declaration::Variable(v) => {
@@ -89,6 +91,7 @@ mod test {
                 Rc::new(Variable::boolean("flag".to_string()))],
             Scope::empty()
         );
+        let mut sym = SymbolTable::new();
         let decl = parse_declaration(
             CSC488Parser::parse(Rule::declaration,
                 "func my_procedure(x, y integer, flag boolean) {
@@ -96,7 +99,8 @@ mod test {
                         var an_array_variable, another_array_variable [3] boolean
                     }
                  }")
-            .unwrap().next().unwrap()
+            .unwrap().next().unwrap(),
+            &mut sym
         ).unwrap();
         match decl {
             Declaration::Procedure(p) => assert_eq!(p, target_procedure),
