@@ -5,12 +5,11 @@ extern crate pest_derive;
 #[macro_use]
 extern crate lazy_static;
 
+extern crate inkwell;
+
 pub mod parser;
 pub mod ast;
-
-pub struct Configuration {
-
-}
+pub mod codegen;
 
 fn main() {
     println!("Hello world!");
