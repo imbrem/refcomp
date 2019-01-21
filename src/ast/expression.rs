@@ -313,6 +313,14 @@ pub enum Expression {
     FunctionCall(FunctionCall)
 }
 
+pub fn parse_arguments(pair : Pair<Rule>, sym : &SymbolTable)
+-> Result<Vec<Expression>, &'static str> {
+    if pair.as_rule() != Rule::arguments {return Err("Not arguments");}
+    pair.into_inner()
+            .map(|arg| Expression::from_pair(arg, sym))
+            .collect()
+}
+
 impl Expression {
 
     fn parse_primary(pair : Pair<Rule>, sym : &SymbolTable) -> EPResult {
@@ -328,13 +336,10 @@ impl Expression {
             Rule::function_call => {
                 let mut pairs = pair.into_inner();
                 let fn_name = pairs.next().unwrap().as_str();
-                let arguments : Result<Vec<_>, _>= match pairs.next() {
-                    Some(args) => args.into_inner()
-                        .map(|arg| Expression::from_pair(arg, sym))
-                        .collect(),
-                    None => Ok(Vec::new())
+                let arguments = match pairs.next() {
+                    Some(args) => parse_arguments(args, sym)?,
+                    None => Vec::new()
                 };
-                let arguments = arguments?;
                 FunctionCall::new(
                     match sym.dereference(fn_name) {
                         Some(Symbol::Function(f)) => f,

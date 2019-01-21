@@ -1,10 +1,13 @@
-use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable};
-use super::expression::{Expression, ArrayIndex};
+use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable, Callable};
+use super::expression::{Expression, ArrayIndex, parse_arguments};
 use super::declaration::Declaration;
 use super::parse_bare_scope;
+use super::types::Typed;
 use crate::parser::Rule;
 use pest::iterators::Pair;
 use std::rc::Rc;
+
+type SPResult = Result<Statement, &'static str>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum AssignmentDestination {
@@ -53,7 +56,21 @@ pub struct Repeat {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProcedureCall {
-    pub procedure : Rc<Procedure>
+    procedure : Rc<Procedure>,
+    arguments : Vec<Expression>
+}
+
+impl ProcedureCall {
+    pub fn new(procedure : Rc<Procedure>, arguments : Vec<Expression>) -> SPResult {
+        if procedure.get_arity() == arguments.len() {
+            for (arg, typ) in arguments.iter()
+                .zip(procedure.get_params().iter().map(|p| p.get_type())) {
+                if arg.get_type() != typ {return Err("Argument type mismatch");}
+            }
+            Ok(Statement::ProcedureCall(
+                ProcedureCall{procedure : procedure, arguments : arguments})
+        )} else {Err("Invalid number of arguments to function call")}
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -230,7 +247,23 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
             panic!("Input is not yet implemented!")
         },
         Rule::procedure_call => {
-            panic!("Procedure calls are not yet implemented!")
+            let mut pairs = pair.into_inner();
+            let name = pairs.next().unwrap().as_str();
+            let procedure = match sym.dereference(name)? {
+                Symbol::Procedure(p) => p,
+                _ => {return None}
+            };
+            let args = match pairs.next() {
+                Some(args) => match parse_arguments(args, sym) {
+                    Ok(args) => args,
+                    _ => {return None}
+                },
+                None => Vec::new()
+            };
+            match ProcedureCall::new(procedure, args) {
+                Ok(s) => Some(s),
+                _ => None
+            }
         },
         Rule::scope => Some(
             Statement::Scope(parse_bare_scope(pair.into_inner().next().unwrap(), sym).unwrap())
