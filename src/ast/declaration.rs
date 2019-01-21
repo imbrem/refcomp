@@ -93,8 +93,10 @@ pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<De
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::statement::{Statement, Scope, Assignment, OutputElement};
-    use crate::ast::expression::{Expression, Constant};
+    use crate::ast::statement::
+        {Statement, Scope, Assignment, OutputElement, Conditional, ConditionalBranch};
+    use crate::ast::expression::{
+        Expression, Arithmetic, ArithmeticOp, Logical, LogicalOp, Constant};
     use crate::parser::{Rule, CSC488Parser};
     use crate::ast::types::{ArrayType, ScalarType, Type};
     use pest::Parser;
@@ -129,12 +131,15 @@ mod test {
                 Rc::new(Variable::integer("y".to_string())),
                 Rc::new(Variable::boolean("flag".to_string()))]
         );
+        let param_x = Rc::new(Variable::boolean("x".to_string()));
+        let param_y = Rc::new(Variable::boolean("y".to_string()));
+        let param_n = Rc::new(Variable::integer("n".to_string()));
         let mut target_function = Function::new(
             "a_nested_function".to_string(),
             vec![
-                Rc::new(Variable::boolean("x".to_string())),
-                Rc::new(Variable::boolean("y".to_string())),
-                Rc::new(Variable::integer("n".to_string()))],
+                param_x.clone(),
+                param_y.clone(),
+                param_n.clone()],
             Type::integer()
         );
         let atype =
@@ -148,10 +153,49 @@ mod test {
                 "another_array_variable".to_string(),
                 atype.clone()
             )))];
+        let nested_if_condition = Logical::new(
+            Expression::Variable(param_x.clone()),
+            Expression::Variable(param_y.clone()),
+            LogicalOp::And
+        ).unwrap();
+        let nested_if_return = Statement::Return(
+            Some(Arithmetic::new(
+                Expression::Variable(param_n.clone()),
+                Expression::Constant(Constant::Integer(1)),
+                ArithmeticOp::Add
+            ).unwrap())
+        );
+        let nested_else_return = Statement::Return(
+            Some(Arithmetic::new(
+                Expression::Variable(param_n.clone()),
+                Expression::Constant(Constant::Integer(2)),
+                ArithmeticOp::Mul
+            ).unwrap())
+        );
+        let nested_unreachable_return = Statement::Return(
+            Some(Expression::Variable(param_n.clone()))
+        );
+        let nested_if = Conditional{
+            conditional_branches : vec![ConditionalBranch{
+                condition : nested_if_condition,
+                scope : Scope::new_from_symbols(
+                    vec![nested_if_return], Vec::new()
+                )
+            }],
+            else_branch : Some(Scope::new_from_symbols(
+                vec![nested_else_return], Vec::new()
+            ))
+        };
+
+
         target_function.implement(
-            Scope::new_from_symbols(Vec::new(), nested_variables));
+            Scope::new_from_symbols(vec![
+                Statement::Conditional(nested_if),
+                nested_unreachable_return
+                ], nested_variables));
 
         let inner_variable = Rc::new(Variable::integer("an_integer".to_string()));
+
         let target_constant_assignment = Assignment::to_variable(
             inner_variable.clone(),
             Expression::Constant(Constant::Integer(75))
@@ -183,6 +227,12 @@ mod test {
                 "func my_procedure(x, y integer, flag boolean) {
                     func a_nested_function(x, y boolean, n integer) integer {
                         var an_array_variable, another_array_variable [3] boolean
+                        if x and y {
+                            return n + 1
+                        } else {
+                            return n * 2
+                        }
+                        return n
                     }
                     var an_integer integer
                     // Assign a constant value to the integer

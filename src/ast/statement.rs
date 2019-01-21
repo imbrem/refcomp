@@ -143,7 +143,7 @@ pub enum Statement {
     While(While),
     Repeat(Repeat),
     Break(u32),
-    Return(Expression),
+    Return(Option<Expression>),
     Print(Vec<OutputElement>),
     Input(Vec<String>),
     ProcedureCall(ProcedureCall),
@@ -203,8 +203,9 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
         Rule::repeat_loop => {
             panic!("Repetition loops are not yet implemented!")
         },
-        Rule::return_statement => {
-            panic!("Return statements are not yet implemented!")
+        Rule::return_statement => match pair.into_inner().next() {
+            Some(e) => Some(Statement::Return(Some(Expression::from_pair(e, sym).unwrap()))),
+            None => Some(Statement::Return(None))
         },
         Rule::print_statement => {
             let outputs = pair.into_inner().next().unwrap().into_inner().map(|o| {
