@@ -233,10 +233,14 @@ pub struct FunctionCall {
 }
 
 impl FunctionCall {
-    pub fn new(function : Rc<Function>, arguments : Vec<Expression>) -> Option<Expression> {
-        if function.get_arity() == arguments.len() {Some(
-            Expression::FunctionCall(FunctionCall{function : function, arguments : arguments})
-        )} else {None}
+    pub fn new(function : Rc<Function>, arguments : Vec<Expression>) -> EPResult {
+        if function.get_arity() == arguments.len() {
+            for (arg, typ) in arguments.iter()
+                .zip(function.get_params().iter().map(|p| p.get_type())) {
+                if arg.get_type() != typ {return Err("Argument type mismatch");}
+            }
+            Ok(Expression::FunctionCall(FunctionCall{function : function, arguments : arguments})
+        )} else {Err("Invalid number of arguments to function call")}
     }
 }
 
