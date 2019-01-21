@@ -325,7 +325,27 @@ impl Expression {
             },
             Rule::expression => Self::from_pair(pair, sym),
             Rule::ternary_expression => panic!("Not yet implemented!"),
-            Rule::function_call => panic!("Not yet implemented!"),
+            Rule::function_call => {
+                let mut pairs = pair.into_inner();
+                let fn_name = pairs.next().unwrap().as_str();
+                let arguments : Result<Vec<_>, _>= match pairs.next() {
+                    Some(args) => args.into_inner()
+                        .map(|arg| Expression::from_pair(arg, sym))
+                        .collect(),
+                    None => Ok(Vec::new())
+                };
+                let arguments = arguments?;
+                FunctionCall::new(
+                    match sym.dereference(fn_name) {
+                        Some(Symbol::Function(f)) => f,
+                        Some(Symbol::Procedure(_)) => {
+                            return Err("Cannot call procedure in expression")},
+                        Some(Symbol::Variable(_)) => {
+                            return Err("Cannot call variable as function")},
+                        _ => {return Err("Function undefined")}
+                    },
+                    arguments
+            )},
             Rule::kw_true => Ok(Expression::Constant(Constant::Boolean(true))),
             Rule::kw_false => Ok(Expression::Constant(Constant::Boolean(false))),
             Rule::array_index => {
