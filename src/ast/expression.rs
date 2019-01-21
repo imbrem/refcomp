@@ -514,4 +514,29 @@ mod test {
             Expression::Variable(vx)
         )
     }
+
+    #[test]
+    fn function_calls_parse_correctly() {
+        let mut sym = SymbolTable::new();
+        let f = Rc::new(Function::new("f".to_string(), vec![
+            Rc::new(Variable::integer("x".to_string())),
+            Rc::new(Variable::boolean("flag".to_string()))],
+            Type::integer()
+        ));
+        sym.define(Symbol::Function(f.clone()));
+        let result = Expression::from_pair(
+                CSC488Parser::parse(Rule::expression, "f(5, true)").unwrap().next().unwrap(),
+                &sym
+            ).unwrap();
+        assert_eq!(
+            result,
+            FunctionCall::new(
+                f,
+                vec![
+                    Expression::Constant(Constant::Integer(5)),
+                    Expression::Constant(Constant::Boolean(true))]
+            ).unwrap()
+        );
+        assert_eq!(result.get_type(), Type::integer());
+    }
 }
