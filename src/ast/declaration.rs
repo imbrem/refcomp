@@ -227,8 +227,9 @@ mod test {
                 "func my_procedure(x, y integer, flag boolean) {
                     func a_nested_function(x, y boolean, n integer) integer {
                         var an_array_variable, another_array_variable [3] boolean
-                        if x and y {
-                            return n + 1
+                        if x and y { /* Multiline
+                            comment
+                            */return n + 1
                         } else {
                             return n * 2
                         }
