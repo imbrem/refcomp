@@ -93,7 +93,7 @@ pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<De
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::statement::{Statement, Scope, Assignment};
+    use crate::ast::statement::{Statement, Scope, Assignment, OutputElement};
     use crate::ast::expression::{Expression, Constant};
     use crate::parser::{Rule, CSC488Parser};
     use crate::ast::types::{ArrayType, ScalarType, Type};
@@ -152,17 +152,30 @@ mod test {
             Scope::new_from_symbols(Vec::new(), nested_variables));
 
         let inner_variable = Rc::new(Variable::integer("an_integer".to_string()));
-        let target_assignment = Assignment::to_variable(
+        let target_constant_assignment = Assignment::to_variable(
             inner_variable.clone(),
             Expression::Constant(Constant::Integer(75))
         );
+        let target_variable_assignment = Assignment::to_variable(
+            inner_variable.clone(),
+            Expression::Variable(inner_variable.clone())
+        );
+
+        let target_print = vec![
+            OutputElement::Text("hello".to_string()),
+            OutputElement::Expression(Expression::Variable(inner_variable.clone()))
+        ];
 
         target_procedure.implement(Scope::new_from_symbols(
-            vec![Statement::Assignment(target_assignment)],
+            vec![
+                Statement::Assignment(target_constant_assignment),
+                Statement::Assignment(target_variable_assignment),
+                Statement::Print(target_print)
+                ],
             vec![
                 Symbol::Function(Rc::new(target_function)),
                 Symbol::Variable(inner_variable)
-            ]));
+                ]));
 
         let mut sym = SymbolTable::new();
         let decl = parse_declaration(
@@ -172,7 +185,12 @@ mod test {
                         var an_array_variable, another_array_variable [3] boolean
                     }
                     var an_integer integer
+                    // Assign a constant value to the integer
                     an_integer = 15 * 5
+                    // Assign the integer to itself
+                    an_integer = an_integer
+                    // Print out the value of the integer
+                    print \"hello\", an_integer
                  }")
             .unwrap().next().unwrap(),
             &mut sym

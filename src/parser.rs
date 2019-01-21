@@ -85,4 +85,52 @@ mod test {
                 ])])]
         )
     }
+
+    #[test]
+    fn texts_parse_correctly() {
+        parses_to!(
+            parser : CSC488Parser,
+            input : "\"text\"",
+            rule : Rule::text,
+            tokens : [
+                text(0, 6, [string_text(1, 5)])
+            ]
+        );
+    }
+
+    #[test]
+    fn print_statements_parse_correctly() {
+        parses_to!(
+            parser : CSC488Parser,
+            input : "print \"hello\"",
+            rule : Rule::print_statement,
+            tokens : [
+                print_statement(0, 13, [output(6, 13, [
+                        single_output(6, 13, [text(6, 13, [string_text(7, 12)])])])])
+            ]
+        );
+    }
+
+    #[test]
+    fn multiple_statements_parse_correctly() {
+        parses_to!(
+            parser : CSC488Parser,
+            input : "x = 2 print \"hello\", x",
+            rule : Rule::statements,
+            tokens : [statements(0, 22, [
+                assignment(0, 6, [
+                    identifier(0, 1),
+                    expression(4, 6, [binary_expression(4, 6, [
+                        primary_expression(4, 5, [integer(4, 5)])])])
+                    ]),
+                print_statement(6, 22, [output(12, 22, [
+                    single_output(12, 19, [text(12, 19, [string_text(13, 18)])]),
+                    single_output(21, 22, [
+                        expression(21, 22, [
+                            binary_expression(21, 22, [
+                                primary_expression(21, 22, [identifier(21, 22)])])])])
+                    ])])
+            ])]
+        )
+    }
 }

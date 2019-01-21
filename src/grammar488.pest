@@ -164,5 +164,5 @@ parameter_name = _{identifier}
 array_name = _{identifier}
 identifier = @{!keyword ~ ("_"|ASCII_ALPHA) ~ ("_"|ASCII_ALPHANUMERIC)*}
 integer = @{"0"|(ASCII_NONZERO_DIGIT ~ ASCII_DIGIT*)}
-text = @{"\"" ~ string_text ~ "\""}
-string_text = @{(!NEWLINE ~ ASCII)*}
+text = ${"\"" ~ string_text ~ "\""}
+string_text = @{(!(NEWLINE|"\"") ~ ASCII)*}

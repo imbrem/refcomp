@@ -192,7 +192,23 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
             panic!("Return statements are not yet implemented!")
         },
         Rule::print_statement => {
-            panic!("Printing is not yet implemented!")
+            let outputs = pair.into_inner().next().unwrap().into_inner().map(|o| {
+                    let o = o.into_inner().next();
+                    if let Some(o) = o {
+                        match o.as_rule() {
+                            Rule::expression =>
+                                OutputElement::Expression(Expression::from_pair(o, sym).unwrap()),
+                            Rule::text =>
+                                OutputElement::Text(
+                                    o.into_inner().next().unwrap().as_str().to_string()
+                                ),
+                            _ => unreachable!()
+                        }
+                    } else {
+                        OutputElement::Newline
+                    }
+                });
+            Some(Statement::Print(outputs.collect()))
         },
         Rule::input_statement => {
             panic!("Input is not yet implemented!")
