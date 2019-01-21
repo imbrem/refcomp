@@ -35,9 +35,8 @@ pub struct ConditionalBranch {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Conditional {
-    pub if_branch : ConditionalBranch,
-    pub elif_branches : Vec<ConditionalBranch>,
-    pub else_branch : Option<ConditionalBranch>
+    pub conditional_branches : Vec<ConditionalBranch>,
+    pub else_branch : Option<Scope>
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -180,7 +179,23 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
     match pair.as_rule() {
         Rule::assignment => parse_assignment(pair, sym),
         Rule::conditional => {
-            panic!("Conditionals are not yet implemented!")
+            let mut pairs = pair.into_inner();
+            let conditional_branches = pairs.next().unwrap().into_inner()
+                .map(|b| {
+                    let mut pairs = b.into_inner();
+                    let expression = Expression::from_pair(pairs.next().unwrap(), sym).unwrap();
+                    let scope =
+                        parse_bare_scope(pairs.next().unwrap().into_inner().next().unwrap(), sym)
+                        .unwrap();
+                    ConditionalBranch{condition : expression, scope : scope}
+                }).collect();
+            let else_branch = match pairs.next() {
+                Some(e) =>
+                parse_bare_scope(e.into_inner().next().unwrap().into_inner().next().unwrap(), sym),
+                None => None
+            };
+            Some(Statement::Conditional(Conditional{
+                        conditional_branches : conditional_branches, else_branch : else_branch}))
         },
         Rule::while_loop => {
             panic!("While loops are not yet implemented!")

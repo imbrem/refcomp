@@ -38,7 +38,8 @@ scope = {"{" ~ bare_scope ~ "}"}
 assignment = {variable ~ "=" ~ expression}
 else_statement = {kw_else ~ scope}
 if_statement = {kw_if ~ expression ~ scope}
-conditional = {if_statement ~ (kw_else ~ if_statement)*  ~ else_statement?}
+conditional_branches = {if_statement ~ (kw_else ~ if_statement)*}
+conditional = {conditional_branches  ~ else_statement?}
 while_loop = {kw_while ~ expression ~ scope}
 repeat_loop = {kw_repeat ~ scope ~ kw_until ~ expression}
 break_loop = {kw_break ~ integer?}
