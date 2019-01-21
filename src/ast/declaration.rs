@@ -1,5 +1,4 @@
 use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped};
-use super::statement::{Scope};
 use super::types::{parse_type};
 use super::{parse_bare_scope};
 use crate::parser::{Rule};
@@ -94,7 +93,7 @@ pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<De
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::ast::statement::{Statement, Assignment};
+    use crate::ast::statement::{Statement, Scope, Assignment};
     use crate::ast::expression::{Expression, Constant};
     use crate::parser::{Rule, CSC488Parser};
     use crate::ast::types::{ArrayType, ScalarType, Type};
