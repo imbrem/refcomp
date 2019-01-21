@@ -128,12 +128,35 @@ mod test {
                 Rc::new(Variable::integer("y".to_string())),
                 Rc::new(Variable::boolean("flag".to_string()))]
         );
-        target_procedure.implement(Scope::empty());
+        let mut target_function = Function::new(
+            "a_nested_function".to_string(),
+            vec![
+                Rc::new(Variable::boolean("x".to_string())),
+                Rc::new(Variable::boolean("y".to_string())),
+                Rc::new(Variable::integer("n".to_string()))],
+            Type::integer()
+        );
+        let atype =
+            Type::ArrayType(Rc::new(ArrayType::new(ScalarType::Boolean, vec![3])));
+        let nested_variables = vec![
+            Symbol::Variable(Rc::new(Variable::new(
+                "an_array_variable".to_string(),
+                atype.clone()
+            ))),
+            Symbol::Variable(Rc::new(Variable::new(
+                "another_array_variable".to_string(),
+                atype.clone()
+            )))];
+        target_function.implement(
+            Scope::new_from_symbols(Vec::new(), nested_variables));
+        target_procedure.implement(Scope::new_from_symbols(
+            Vec::new(), vec![Symbol::Function(Rc::new(target_function))]));
+
         let mut sym = SymbolTable::new();
         let decl = parse_declaration(
             CSC488Parser::parse(Rule::declaration,
                 "func my_procedure(x, y integer, flag boolean) {
-                    func a_nested_function(x, y boolean, n integer) {
+                    func a_nested_function(x, y boolean, n integer) integer {
                         var an_array_variable, another_array_variable [3] boolean
                     }
                  }")
