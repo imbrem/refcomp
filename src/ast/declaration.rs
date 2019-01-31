@@ -229,11 +229,11 @@ mod test {
                         var an_array_variable, another_array_variable [3] boolean
                         if x and y { /* Multiline
                             comment
-                            */return n + 1
+                            */return (n + 1)
                         } else {
-                            return n * 2
+                            return (n * 2)
                         }
-                        return n
+                        return (n)
                     }
                     var an_integer integer
                     // Assign a constant value to the integer

@@ -43,7 +43,7 @@ conditional = {conditional_branches  ~ else_statement?}
 while_loop = {kw_while ~ expression ~ scope}
 repeat_loop = {kw_repeat ~ scope ~ kw_until ~ expression}
 break_loop = {kw_break ~ integer?}
-return_statement = {kw_return ~ expression?}
+return_statement = {kw_return ~ ("(" ~ expression ~ ")")?}
 print_statement = {kw_print ~ output}
 input_statement = {kw_input ~ input}
 procedure_call = {procedure_name ~ "(" ~ arguments? ~ ")"}
@@ -80,7 +80,7 @@ primary_expression = {
     | variable
     | negation_expression
 }
-ternary_expression = {"(" ~ expression ~ kw_if ~ expression ~ kw_else ~ expression ~ ")"}
+ternary_expression = {expression ~ kw_if ~ expression ~ kw_else ~ expression}
 function_call = {identifier ~ "(" ~ arguments? ~ ")"}
 negation_expression = {op_minus ~ expression}
 
@@ -88,7 +88,7 @@ op_plus = {"+"}
 op_minus = {"-"}
 op_times = {"*"}
 op_divides = {"/"}
-op_eq = {"=="}
+op_eq = {"="}
 op_neq = {"!="}
 op_lt = {"<"}
 op_leq = {"<="}
@@ -99,7 +99,7 @@ binary_operator = _{
     op_plus | op_minus | op_times | op_divides
 }
 comparison_operator = _{
-  op_eq | op_neq | op_lt | op_leq | op_gt | op_geq
+  op_eq | op_neq | op_geq | op_leq | op_lt | op_gt
 }
 
 binary_expression = {
