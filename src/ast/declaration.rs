@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped};
+use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped, Callable};
 use super::types::{parse_type};
 use super::{parse_bare_scope};
 use crate::parser::{Rule};

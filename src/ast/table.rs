@@ -4,6 +4,7 @@ use super::statement::Scope;
 use std::collections::BTreeMap as SymbolMap;
 
 pub trait Callable {
+    fn get_name(&self) -> &str;
     fn get_arity(&self) -> usize;
     fn get_params(&self) -> &Vec<Rc<Variable>>;
     fn get_scope(&self) -> Option<&Scope>;
@@ -54,7 +55,6 @@ impl Function {
     pub fn implement(&mut self, scope : Scope) {
         self.fn_impl = Some(scope);
     }
-    pub fn get_name(&self) -> &str {&self.name}
 }
 
 impl Callable for Function {
@@ -62,6 +62,7 @@ impl Callable for Function {
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
     fn get_scope(&self) -> Option<&Scope> {self.fn_impl.as_ref()}
     fn get_return(&self) -> Type {self.ret_type.clone()}
+    fn get_name(&self) -> &str {&self.name}
 }
 
 impl Typed for Function {
@@ -93,7 +94,6 @@ impl Procedure {
     pub fn implement(&mut self, scope : Scope) {
         self.pr_impl = Some(scope);
     }
-    pub fn get_name(&self) -> &str {&self.name}
 }
 
 impl Callable for Procedure {
@@ -101,6 +101,7 @@ impl Callable for Procedure {
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
     fn get_scope(&self) -> Option<&Scope> {self.pr_impl.as_ref()}
     fn get_return(&self) -> Type {Type::Void}
+    fn get_name(&self) -> &str {&self.name}
 }
 
 impl Scoped for Procedure {
