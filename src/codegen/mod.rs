@@ -5,8 +5,9 @@
 use std::rc::Rc;
 use std::collections::HashMap;
 
-use crate::ast::table::{Variable};
+use crate::ast::table::{Variable, Function, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
+use crate::ast::statement::{Scope};
 use by_address::ByAddress;
 
 use inkwell::{
@@ -26,6 +27,7 @@ pub struct Compiler {
     pub fpm : PassManager,
     pub module : Module,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
+    functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
     curr_fn : Option<FunctionValue>
 }
 
@@ -43,6 +45,7 @@ impl Compiler {
             fpm : fpm,
             module : module,
             variables : HashMap::new(),
+            functions : HashMap::new(),
             curr_fn : None
         }
     }
@@ -78,4 +81,25 @@ impl Compiler {
         }
     }
 
+    fn register_variable(&mut self, var : Rc<Variable>, entry : Option<&BasicBlock>) {
+        let pointer_val = self.create_entry_block_alloca(var.as_ref(), entry);
+        self.variables.insert(ByAddress(var), pointer_val);
+    }
+
+    pub fn compile_prototype<T: Callable>(&mut self, func : Rc<T>)
+    -> Result<FunctionValue, &'static str> {
+        Err("Not yet implemented")
+    }
+
+    fn implement_prototype(&mut self, scope : &Scope, func : FunctionValue)
+    -> Result<Function, &'static str> {
+        Err("Not yet implemented")
+    }
+
+    pub fn compile_fn<T: Callable>(&mut self, func : Rc<T>) -> Result<FunctionValue, &'static str>
+    {
+        // Compile the prototype
+        let proto = self.compile_prototype(func)?;
+        Err("Not yet implemented")
+    }
 }

@@ -126,6 +126,10 @@ impl Scope {
             statements : vec![]
         }
     }
+
+    pub fn get_variables(&self) -> &Vec<Rc<Variable>> {&self.variables}
+    pub fn get_functions(&self) -> &Vec<Rc<Function>> {&self.functions}
+    pub fn get_procedures(&self) -> &Vec<Rc<Procedure>> {&self.procedures}
 }
 
 impl Scoped for Scope {

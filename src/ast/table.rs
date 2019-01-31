@@ -6,6 +6,8 @@ use std::collections::BTreeMap as SymbolMap;
 pub trait Callable {
     fn get_arity(&self) -> usize;
     fn get_params(&self) -> &Vec<Rc<Variable>>;
+    fn get_scope(&self) -> Option<&Scope>;
+    fn get_return(&self) -> Type;
 }
 
 pub trait Scoped {
@@ -58,6 +60,8 @@ impl Function {
 impl Callable for Function {
     fn get_arity(&self) -> usize {self.args.len()}
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
+    fn get_scope(&self) -> Option<&Scope> {self.fn_impl.as_ref()}
+    fn get_return(&self) -> Type {self.ret_type.clone()}
 }
 
 impl Typed for Function {
@@ -95,6 +99,8 @@ impl Procedure {
 impl Callable for Procedure {
     fn get_arity(&self) -> usize {self.args.len()}
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
+    fn get_scope(&self) -> Option<&Scope> {self.pr_impl.as_ref()}
+    fn get_return(&self) -> Type {Type::Void}
 }
 
 impl Scoped for Procedure {
