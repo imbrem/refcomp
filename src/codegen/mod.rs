@@ -2,11 +2,13 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
+use crate::ast::statement::Statement;
 use inkwell::types::BasicTypeEnum;
+use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-use crate::ast::table::{Variable, Function, Callable};
+use crate::ast::table::{Variable, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
 use crate::ast::statement::{Scope};
 use by_address::ByAddress;
@@ -14,38 +16,61 @@ use by_address::ByAddress;
 use inkwell::{
     context::Context,
     builder::Builder,
-    passes::PassManager,
     module::Module,
     basic_block::BasicBlock};
 use inkwell::values::{
     PointerValue,
     FunctionValue,
+    GlobalValue,
     BasicValueEnum
 };
 
 pub struct Compiler {
     pub context : Context,
-    pub builder : Builder,
-    pub fpm : PassManager,
     pub module : Module,
+    builder : Builder,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
+    globals : HashMap<ByAddress<Rc<Variable>>, GlobalValue>,
     curr_fn : Option<FunctionValue>
 }
 
 impl Compiler {
 
+    pub fn get_llvm_type(&self, typ : Type) -> Option<BasicTypeEnum> {
+        match typ {
+            Type::Null => None,
+            Type::Void => None,
+            Type::ArrayType(_) => panic!("Array types not implemented!"),
+            Type::ScalarType(s) => match s {
+                ScalarType::Integer => Some(self.context.i64_type().into()),
+                ScalarType::Boolean => Some(self.context.bool_type().into())
+            }
+        }
+    }
+
+    pub fn get_param_type(&self, typ : Type) -> Result<BasicTypeEnum, &'static str> {
+        match typ {
+            Type::Null => Err("Null types not implemented"),
+            Type::Void => Err("Cannot pass void type"),
+            Type::ArrayType(_) => Err("Cannot pass array types"),
+            Type::ScalarType(s) => match s {
+                ScalarType::Integer => Ok(self.context.i64_type().into()),
+                ScalarType::Boolean => Ok(self.context.bool_type().into())
+            }
+        }
+    }
+
     pub fn new(
         context : Context,
-        builder : Builder,
-        fpm : PassManager,
         module : Module
     ) -> Compiler {
+        let builder = context.create_builder();
         Compiler {
             context : context,
-            builder: builder,
-            fpm : fpm,
             module : module,
+            builder : builder,
             variables : HashMap::new(),
+            globals : HashMap::new(),
             curr_fn : None
         }
     }
@@ -60,8 +85,14 @@ impl Compiler {
     fn create_entry_block_alloca(&self, var : &Variable, entry : Option<&BasicBlock>)
     -> PointerValue {
         let builder = self.context.create_builder();
-        let owned_entry = self.curr_fn.unwrap().get_entry_basic_block();
-        let entry = owned_entry.as_ref().or(entry).unwrap();
+        let owned_entry = match self.curr_fn {
+            Some(f) => f.get_entry_basic_block(),
+            None => None
+        };
+        let entry = match entry {
+            Some(entry) => entry,
+            None => owned_entry.as_ref().unwrap()
+        };
 
         match entry.get_first_instruction() {
             Some(instruction) => builder.position_before(&instruction),
@@ -88,17 +119,18 @@ impl Compiler {
         pointer_val
     }
 
+    pub fn register_global(&mut self, var : Rc<Variable>) {
+        let new_global = self.module.add_global(
+            self.get_llvm_type(var.get_type()).unwrap(),
+            Some(AddressSpace::Generic), var.get_name());
+        let pointer_to_global = new_global.as_pointer_value();
+        self.globals.insert(ByAddress(var.clone()), new_global);
+        self.variables.insert(ByAddress(var), pointer_to_global);
+    }
+
     fn get_param_types<T: Callable>(&self, func : &Rc<T>)
     -> Result<Vec<BasicTypeEnum>, &'static str> {
-        func.get_params().iter().map(|t| match t.get_type() {
-            Type::Null => Err("Null types not implemented"),
-            Type::Void => Err("Void type in parameter list"),
-            Type::ArrayType(_) => Err("Cannot pass array type"),
-            Type::ScalarType(s) => match s {
-                ScalarType::Integer => Ok(self.context.i64_type().into()),
-                ScalarType::Boolean => Ok(self.context.bool_type().into())
-            }
-        }).collect()
+        func.get_params().iter().map(|t| self.get_param_type(t.get_type())).collect()
     }
 
     fn compile_prototype<T: Callable>(&mut self, func : Rc<T>)
@@ -135,9 +167,16 @@ impl Compiler {
         Ok(fn_val)
     }
 
+    fn implement_statement(&mut self, statement : &Statement) -> Result<(), &'static str> {
+        Err("Statements not yet implemented")
+    }
+
     fn implement_scope(&mut self, scope : &Scope, func : FunctionValue)
     -> Result<FunctionValue, &'static str> {
-        Err("Not yet implemented")
+        // Register all variables
+        for var in scope.get_variables().iter().cloned() {self.register_variable(var, None);}
+        for statement in scope.get_statements() {self.implement_statement(statement)?}
+        Ok(func)
     }
 
     pub fn compile_fn<T: Callable>(&mut self, func : Rc<T>) -> Result<FunctionValue, &'static str>

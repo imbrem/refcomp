@@ -130,6 +130,7 @@ impl Scope {
     pub fn get_variables(&self) -> &Vec<Rc<Variable>> {&self.variables}
     pub fn get_functions(&self) -> &Vec<Rc<Function>> {&self.functions}
     pub fn get_procedures(&self) -> &Vec<Rc<Procedure>> {&self.procedures}
+    pub fn get_statements(&self) -> &Vec<Statement> {&self.statements}
 }
 
 impl Scoped for Scope {
@@ -140,8 +141,8 @@ impl Scoped for Scope {
         for func in &self.functions {
             sym.define(Symbol::Function(func.clone()))
         }
-        for proc in &self.procedures {
-            sym.define(Symbol::Procedure(proc.clone()))
+        for pr in &self.procedures {
+            sym.define(Symbol::Procedure(pr.clone()))
         }
     }
     fn leave_scope(&self, sym : &mut SymbolTable) {
@@ -151,8 +152,8 @@ impl Scoped for Scope {
         for func in &self.functions {
             sym.undef(func.get_name());
         }
-        for proc in &self.procedures {
-            sym.undef(proc.get_name());
+        for pr in &self.procedures {
+            sym.undef(pr.get_name());
         }
     }
 }
