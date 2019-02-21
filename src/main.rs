@@ -29,7 +29,7 @@ fn main() -> io::Result<()> {
     let scope = match parser::CSC488Parser::parse(parser::Rule::bare_scope, &buffer) {
         Ok(mut scope) => match scope.next( ){
             Some(scope) => {
-                println!("Parsing result:\n{:?}", scope);
+                println!("Parsing result:\n{:#?}\n\n\n", scope);
                 scope
             },
             None => {
@@ -49,7 +49,7 @@ fn main() -> io::Result<()> {
         let mut sym = SymbolTable::new();
         match parse_bare_scope(scope, &mut sym) {
             Ok(scope) => {
-                println!("AST:\n{:?}", scope);
+                println!("AST:\n{:#?}\n\n\n", scope);
                 scope
             },
             Err(s) => {
@@ -66,7 +66,7 @@ fn main() -> io::Result<()> {
 
     let mut compiler = Compiler::new(context, module);
 
-    println!("Compiler initialized!");
+    println!("Compiler initialized!\n\n");
 
     println!("Registering globals...");
 
@@ -75,7 +75,7 @@ fn main() -> io::Result<()> {
         for variable in scope.get_variables().iter().cloned() {
             compiler.register_global(variable); cnt += 1;
         }
-        println!("Registered {} globals!", cnt);
+        println!("Registered {} globals!\n", cnt);
     }
 
     println!("Registering procedures...");
@@ -92,7 +92,7 @@ fn main() -> io::Result<()> {
             }
             cnt += 1;
         }
-        println!("Registered {} procedures!", cnt);
+        println!("Registered {} procedures!\n", cnt);
     }
 
     println!("Registering functions...");
@@ -109,7 +109,48 @@ fn main() -> io::Result<()> {
             }
             cnt += 1;
         }
-        println!("Registered {} functions!", cnt);
+        println!("Registered {} functions!\n", cnt);
+    }
+
+    println!("Compiling procedures...");
+
+    {
+        let mut cnt = 0;
+        for function in scope.get_procedures().iter().cloned() {
+            match compiler.compile_fn(function.clone()) {
+                Ok(p) => {
+                    println!("Compiled procedure {} to IR:\n----------\n", function.get_name());
+                    p.print_to_stderr();
+                    println!("\n----------\n");
+                },
+                Err(s) => println!(
+                    "Error registering procedure {}: {}\nProcedure Details: {:#?}",
+                    function.get_name(), s, function
+                )
+            }
+            cnt += 1;
+        }
+        println!("Compiled {} procedures!\n", cnt);
+    }
+
+    println!("Compiling functions...");
+
+    {
+        let mut cnt = 0;
+        for function in scope.get_functions().iter().cloned() {
+            match compiler.compile_fn(function.clone()) {
+                Ok(f) => {
+                    println!("Compiled function {} to IR:\n", function.get_name());
+                    f.print_to_stderr();
+                },
+                Err(s) => println!(
+                    "Error registering function {}: {}\nFunction Details: {:#?}",
+                    function.get_name(), s, function
+                )
+            }
+            cnt += 1;
+        }
+        println!("Compiled {} functions!\n", cnt);
     }
 
     Ok(())
