@@ -41,6 +41,7 @@ pub fn implement_declarations<'a>(declarations : &mut Vec<Declaration<'a>>, sym 
     for decl in declarations {
         match decl {
             Declaration::Function(ref mut s, f) => {
+                sym.enter_level();
                 let mut scope = None;
                 std::mem::swap(&mut scope, s);
                 if let Some(scope) = scope {
@@ -48,8 +49,10 @@ pub fn implement_declarations<'a>(declarations : &mut Vec<Declaration<'a>>, sym 
                     f.implement(parse_bare_scope(scope, sym)?);
                     f.leave_scope(sym);
                 } else {return Err("Tried to implement function without scope!");}
+                sym.leave_level();
             },
             Declaration::Procedure(ref mut s, p) => {
+                sym.enter_level();
                 let mut scope = None;
                 std::mem::swap(&mut scope, s);
                 if let Some(scope) = scope {
@@ -58,6 +61,7 @@ pub fn implement_declarations<'a>(declarations : &mut Vec<Declaration<'a>>, sym 
                     p.leave_scope(sym);
                 }
                 else {return Err("Tried to implement function without scope!");}
+                sym.leave_level();
             },
             _ => {}
         }
@@ -158,13 +162,14 @@ mod test {
         let target_procedure = Function::procedure(
             "my_procedure".to_string(),
             vec![
-                Rc::new(Variable::integer("x".to_string())),
-                Rc::new(Variable::integer("y".to_string())),
-                Rc::new(Variable::boolean("flag".to_string()))]
+                Rc::new(Variable::integer("x".to_string()).to_level(1)),
+                Rc::new(Variable::integer("y".to_string()).to_level(1)),
+                Rc::new(Variable::boolean("flag".to_string()).to_level(1))]
         );
-        let param_x = Rc::new(Variable::boolean("x".to_string()));
-        let param_y = Rc::new(Variable::boolean("y".to_string()));
-        let param_n = Rc::new(Variable::integer("n".to_string()));
+        target_procedure.update_level(0);
+        let param_x = Rc::new(Variable::boolean("x".to_string()).to_level(2));
+        let param_y = Rc::new(Variable::boolean("y".to_string()).to_level(2));
+        let param_n = Rc::new(Variable::integer("n".to_string()).to_level(2));
         let target_function = Function::new(
             "a_nested_function".to_string(),
             vec![
@@ -173,17 +178,18 @@ mod test {
                 param_n.clone()],
             Type::integer()
         );
+        target_function.update_level(1);
         let atype =
             Type::ArrayType(Rc::new(ArrayType::new(ScalarType::Boolean, vec![3])));
         let nested_variables = vec![
             Symbol::Variable(Rc::new(Variable::new(
                 "an_array_variable".to_string(),
                 atype.clone()
-            ))),
+            ).to_level(2))),
             Symbol::Variable(Rc::new(Variable::new(
                 "another_array_variable".to_string(),
                 atype.clone()
-            )))];
+            ).to_level(2)))];
         let nested_if_condition = Logical::new(
             Expression::Variable(param_x.clone()),
             Expression::Variable(param_y.clone()),
@@ -225,7 +231,7 @@ mod test {
                 nested_unreachable_return
                 ], nested_variables));
 
-        let inner_variable = Rc::new(Variable::integer("an_integer".to_string()));
+        let inner_variable = Rc::new(Variable::integer("an_integer".to_string()).to_level(1));
 
         let target_constant_assignment = Assignment::to_variable(
             inner_variable.clone(),

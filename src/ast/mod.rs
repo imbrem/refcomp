@@ -52,7 +52,7 @@ mod test {
             CSC488Parser::parse(Rule::bare_scope, "var x integer x = 5 + x")
             .unwrap().next().unwrap(),
             &mut sym);
-        let goal_variable = Rc::new(Variable::integer("x".to_string()));
+        let goal_variable = Rc::new(Variable::integer("x".to_string()).to_level(0));
         let goal_assignment = Assignment::to_variable(
             goal_variable.clone(),
             Arithmetic::new(

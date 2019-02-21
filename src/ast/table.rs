@@ -2,9 +2,7 @@ use by_address::ByAddress;
 use std::rc::Rc;
 use super::types::{Type, Typed};
 use super::statement::Scope;
-use std::collections::HashSet;
-use std::iter::FromIterator;
-use std::cell::{Ref, RefCell};
+use std::cell::{Ref, RefCell, Cell};
 use std::collections::BTreeMap as SymbolMap;
 use std::ops::Deref;
 
@@ -27,7 +25,8 @@ pub trait DependencyVisitor {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Variable {
     var_type : Type,
-    name : String
+    name : String,
+    level : Cell<Option<u32>>
 }
 
 impl DependencyVisitor for Rc<Variable> {
@@ -39,7 +38,7 @@ impl DependencyVisitor for Rc<Variable> {
 
 impl Variable {
     pub fn new(name : String, var_type : Type) -> Variable {
-        Variable{name : name, var_type : var_type}
+        Variable{ name : name, var_type : var_type, level : Cell::new(None) }
     }
     pub fn integer(name : String) -> Variable {
         Self::new(name, Type::integer())
@@ -48,7 +47,18 @@ impl Variable {
         Self::new(name, Type::boolean())
     }
     pub fn get_name(&self) -> &str {&self.name}
-}
+    pub fn update_level(&self, level : u32) {
+        let sl = self.level.get();
+        if sl.is_none() || sl.unwrap() > level {
+            self.level.set(Some(level))
+        }
+    }
+    pub fn get_level(&self) -> Option<u32> {self.level.get()}
+    pub fn to_level(self, level : u32) -> Variable {
+        self.update_level(level);
+        self
+    }
+ }
 
 impl Typed for Variable {
     fn get_type(&self) -> Type {return self.var_type.clone()}
@@ -60,7 +70,8 @@ pub struct Function {
     args : Vec<Rc<Variable>>,
     implicit_args : RefCell<Vec<Rc<Variable>>>,
     ret_type : Type,
-    fn_impl : RefCell<Option<Scope>>
+    fn_impl : RefCell<Option<Scope>>,
+    level : Cell<Option<u32>>
 }
 
 impl Function {
@@ -70,7 +81,8 @@ impl Function {
         args : args,
         ret_type : ret_type,
         implicit_args : RefCell::new(vec![]),
-        fn_impl : RefCell::new(None)
+        fn_impl : RefCell::new(None),
+        level : Cell::new(None)
     }}
     pub fn procedure(name : String, args : Vec<Rc<Variable>>) -> Function {
         Function::new(name, args, Type::Void)
@@ -85,14 +97,16 @@ impl Function {
         self.implicit_args.borrow()
     }
     pub fn implement(&self, scope : Scope) {
-        let mut argument_set : HashSet<ByAddress<Rc<Variable>>>
-            = HashSet::from_iter(self.args.iter().cloned().map(|i| ByAddress(i)));
         let mut iargs = vec![];
-        argument_set.extend(scope.get_variables().iter().cloned().map(|i| ByAddress(i)));
         scope.visit_dependencies(|v : Rc<Variable>| {
             let b = ByAddress(v);
-            if argument_set.contains(&b) {
+            if b.get_level().unwrap() < self.get_level().unwrap() {
                 iargs.push(b.0)
+            } else if b.get_level().unwrap() > self.get_level().unwrap() + 1 {
+                panic!(
+                    "Level of variable {:#?} too high to dereference from this scope ({:#?})!",
+                    b, self
+                );
             }
         });
         self.implicit_args.replace(iargs);
@@ -101,6 +115,14 @@ impl Function {
     pub fn get_scope(&self) -> Ref<Option<Scope>> {
         self.fn_impl.borrow()
     }
+    pub fn update_level(&self, level : u32) {
+        let sl = self.level.get();
+        if sl.is_none() || sl.unwrap() > level {
+            self.level.set(Some(level));
+            for arg in &self.args {arg.update_level(level + 1);}
+        }
+    }
+    pub fn get_level(&self) -> Option<u32> {self.level.get()}
 }
 
 impl DependencyVisitor for Function {
@@ -150,18 +172,41 @@ impl Symbol {
     pub fn variable(name : String, var_type : Type) -> Symbol {
         Symbol::Variable(Rc::new(Variable::new(name, var_type)))
     }
+    pub fn update_level(&self, level : u32) {
+        match self {
+            Symbol::Variable(v) => v.update_level(level),
+            Symbol::Function(f) => f.update_level(level),
+            Symbol::Procedure(p) => p.update_level(level)
+        }
+    }
+    pub fn get_level(&self) -> Option<u32> {
+        match self {
+            Symbol::Variable(v) => v.get_level(),
+            Symbol::Function(f) => f.get_level(),
+            Symbol::Procedure(p) => p.get_level()
+        }
+    }
 }
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct SymbolTable {
-    symbols : SymbolMap<String, Vec<Symbol>>
+    symbols : SymbolMap<String, Vec<Symbol>>,
+    level : u32
 }
 
 impl SymbolTable {
-    pub fn new() -> SymbolTable {SymbolTable{symbols : SymbolMap::new()}}
+    pub fn new() -> SymbolTable {SymbolTable{symbols : SymbolMap::new(), level : 0}}
     pub fn with_init(symbols : SymbolMap<String, Vec<Symbol>>) -> SymbolTable {
-        SymbolTable{symbols : symbols}
+        SymbolTable{symbols : symbols, level : 0}
     }
+
+    pub fn enter_level(&mut self) {
+        self.level += 1;
+    }
+    pub fn leave_level(&mut self) {
+        self.level -= 1;
+    }
+
     pub fn dereference(&self, symbol : &str) -> Option<Symbol> {
         match self.symbols.get(symbol) {
             Some(v) => match v.last() {
@@ -177,6 +222,7 @@ impl SymbolTable {
     }
     pub fn reference(&mut self, name : String, symbol : Symbol) {
         println!("Referencing name {} to symbol {:?}", name, symbol);
+        symbol.update_level(self.level);
         self.symbols.entry(name).or_insert(Vec::with_capacity(1)).push(symbol);
     }
     pub fn undef(&mut self, name : &str) -> Option<Symbol> {
