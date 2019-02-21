@@ -16,10 +16,21 @@ pub trait Scoped {
     fn leave_scope(&self, sym : &mut SymbolTable);
 }
 
+pub trait DependencyVisitor {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T;
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Variable {
     var_type : Type,
     name : String
+}
+
+impl DependencyVisitor for Rc<Variable> {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor: T) -> T {
+        visitor(self.clone());
+        visitor
+    }
 }
 
 impl Variable {
@@ -43,6 +54,7 @@ impl Typed for Variable {
 pub struct Function {
     name : String,
     args : Vec<Rc<Variable>>,
+    implicit_args : Option<Vec<Rc<Variable>>>,
     ret_type : Type,
     fn_impl : Option<Scope>
 }
@@ -50,16 +62,25 @@ pub struct Function {
 impl Function {
     pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type)
     -> Function {Function{
-        name : name, args : args, ret_type : ret_type, fn_impl : None
+        name : name, args : args, ret_type : ret_type, implicit_args : None, fn_impl : None
     }}
     pub fn procedure(name : String, args : Vec<Rc<Variable>>) -> Function {
         Function::new(name, args, Type::Void)
     }
     pub fn with_impl(name : String, args : Vec<Rc<Variable>>, ret_type : Type, fn_impl : Scope)
-    -> Function {Function{
-        name : name, args : args, ret_type : ret_type, fn_impl : Some(fn_impl)
-    }}
+    -> Function {
+        let mut result = Function::new(name, args, ret_type);
+        result.implement(fn_impl);
+        return result
+    }
+    pub fn get_implicit_args(&self) -> Option<&Vec<Rc<Variable>>> {
+        match &self.implicit_args {
+            Some(args) => Some(args),
+            None => None
+        }
+    }
     pub fn implement(&mut self, scope : Scope) {
+        //TODO: implicit arguments
         self.fn_impl = Some(scope);
     }
 }

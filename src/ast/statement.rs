@@ -1,4 +1,4 @@
-use super::table::{Function, Variable, Scoped, Symbol, SymbolTable, Callable};
+use super::table::{Function, Variable, Scoped, Symbol, SymbolTable, Callable, DependencyVisitor};
 use super::expression::{Expression, ArrayIndex, parse_arguments};
 use super::declaration::Declaration;
 use super::parse_bare_scope;
@@ -13,6 +13,15 @@ type SPResult = Result<Statement, &'static str>;
 pub enum AssignmentDestination {
     Variable(Rc<Variable>),
     ArrayIndex(ArrayIndex)
+}
+
+impl DependencyVisitor for AssignmentDestination {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        match self {
+            AssignmentDestination::Variable(v) => v.visit_dependencies(visitor),
+            AssignmentDestination::ArrayIndex(a) => a.visit_dependencies(visitor)
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -30,10 +39,22 @@ impl Assignment {
     }
 }
 
+impl DependencyVisitor for Assignment {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.value.visit_dependencies(self.destination.visit_dependencies(visitor))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct ConditionalBranch {
     pub condition : Expression,
     pub scope : Scope
+}
+
+impl DependencyVisitor for ConditionalBranch {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.condition.visit_dependencies(self.scope.visit_dependencies(visitor))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -42,16 +63,38 @@ pub struct Conditional {
     pub else_branch : Option<Scope>
 }
 
+impl DependencyVisitor for Conditional {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        for branch in &self.conditional_branches {visitor = branch.visit_dependencies(visitor)}
+        match &self.else_branch {
+            Some(scope) => scope.visit_dependencies(visitor),
+            None => visitor
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct While {
     pub condition : Expression,
     pub scope : Scope
 }
 
+impl DependencyVisitor for While {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.condition.visit_dependencies(self.scope.visit_dependencies(visitor))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Repeat {
     pub condition : Expression,
     pub scope : Scope
+}
+
+impl DependencyVisitor for Repeat {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.condition.visit_dependencies(self.scope.visit_dependencies(visitor))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -70,6 +113,13 @@ impl ProcedureCall {
             Ok(Statement::ProcedureCall(
                 ProcedureCall{procedure : procedure, arguments : arguments})
         )} else {Err("Invalid number of arguments to function call")}
+    }
+}
+
+impl DependencyVisitor for ProcedureCall {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        for arg in &self.arguments {visitor = arg.visit_dependencies(visitor)}
+        visitor
     }
 }
 
@@ -158,6 +208,13 @@ impl Scoped for Scope {
     }
 }
 
+impl DependencyVisitor for Scope {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        for statement in &self.statements {visitor = statement.visit_dependencies(visitor)}
+        visitor
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Statement {
     Assignment(Assignment),
@@ -172,11 +229,42 @@ pub enum Statement {
     Scope(Scope)
 }
 
+impl DependencyVisitor for Statement {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        match self {
+            Statement::Assignment(a) => a.visit_dependencies(visitor),
+            Statement::Conditional(c) => c.visit_dependencies(visitor),
+            Statement::While(w) => w.visit_dependencies(visitor),
+            Statement::Repeat(r) => r.visit_dependencies(visitor),
+            Statement::Break(_) => visitor,
+            Statement::Return(Some(e)) => e.visit_dependencies(visitor),
+            Statement::Return(None) => visitor,
+            Statement::Print(v) => {
+                let mut visitor = visitor;
+                for oe in v {visitor = oe.visit_dependencies(visitor)}
+                visitor
+            },
+            Statement::Input(_) => visitor,
+            Statement::ProcedureCall(p) => p.visit_dependencies(visitor),
+            Statement::Scope(s) => s.visit_dependencies(visitor)
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum OutputElement {
     Expression(Expression),
     Text(String),
     Newline
+}
+
+impl DependencyVisitor for OutputElement {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        match self {
+            OutputElement::Expression(e) => e.visit_dependencies(visitor),
+            _ => visitor
+        }
+    }
 }
 
 fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Option<Statement> {

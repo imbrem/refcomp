@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Callable, Symbol, SymbolTable};
+use super::table::{Variable, Function, Callable, Symbol, SymbolTable, DependencyVisitor};
 use super::types::{Type, Typed, ScalarType, ArrayType};
 use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
 use pest::iterators::{Pair};
@@ -16,6 +16,12 @@ pub trait UnaryExpression {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Negation {
     arg : Box<Expression>
+}
+
+impl DependencyVisitor for Negation {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.arg.visit_dependencies(visitor)
+    }
 }
 
 impl UnaryExpression for Negation {
@@ -91,6 +97,12 @@ impl Typed for Arithmetic {
     fn get_type(&self) -> Type {self.rhs.get_type()}
 }
 
+impl DependencyVisitor for Arithmetic {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.rhs.visit_dependencies(self.lhs.visit_dependencies(visitor))
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Not {
     arg : Box<Expression>
@@ -124,6 +136,13 @@ impl UnaryFolder for Not {
 impl Typed for Not {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
 }
+
+impl DependencyVisitor for Not {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.arg.visit_dependencies(visitor)
+    }
+}
+
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum LogicalOp {
@@ -167,6 +186,12 @@ impl Logical {
 
 impl Typed for Logical {
     fn get_type(&self) -> Type {Type::ScalarType(ScalarType::Boolean)}
+}
+
+impl DependencyVisitor for Logical {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.rhs.visit_dependencies(self.lhs.visit_dependencies(visitor))
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -221,6 +246,12 @@ impl Typed for Comparison {
     fn get_type(&self) -> Type {return Type::ScalarType(ScalarType::Boolean)}
 }
 
+impl DependencyVisitor for Comparison {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        self.rhs.visit_dependencies(self.lhs.visit_dependencies(visitor))
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum ComparisonOp {
     EQ, NE, LT, LE, GT, GE
@@ -248,6 +279,13 @@ impl Typed for FunctionCall {
     fn get_type(&self) -> Type {self.function.get_type()}
 }
 
+impl DependencyVisitor for FunctionCall {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        for arg in &self.arguments {visitor = arg.visit_dependencies(visitor)}
+        visitor
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Constant {
     Integer(i64), // Should be 32 bit, but is reduced based off configuration later
@@ -268,6 +306,14 @@ pub struct ArrayIndex {
     variable : Rc<Variable>,
     index : Vec<Expression>,
     idx_type : Type
+}
+
+impl DependencyVisitor for ArrayIndex {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        visitor = self.variable.visit_dependencies(visitor);
+        for index in &self.index {visitor = index.visit_dependencies(visitor)}
+        visitor
+    }
 }
 
 impl ArrayIndex {
@@ -311,6 +357,22 @@ pub enum Expression {
     Variable(Rc<Variable>),
     ArrayIndex(ArrayIndex),
     FunctionCall(FunctionCall)
+}
+
+impl DependencyVisitor for Expression {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, visitor : T) -> T {
+        match self {
+            Expression::Constant(_) => visitor,
+            Expression::Negation(n) => n.visit_dependencies(visitor),
+            Expression::Arithmetic(a) => a.visit_dependencies(visitor),
+            Expression::Not(n) => n.visit_dependencies(visitor),
+            Expression::Logical(l) => l.visit_dependencies(visitor),
+            Expression::Comparison(c) => c.visit_dependencies(visitor),
+            Expression::Variable(v) => v.visit_dependencies(visitor),
+            Expression::ArrayIndex(a) => a.visit_dependencies(visitor),
+            Expression::FunctionCall(f) => f.visit_dependencies(visitor)
+        }
+    }
 }
 
 pub fn parse_arguments(pair : Pair<Rule>, sym : &SymbolTable)
