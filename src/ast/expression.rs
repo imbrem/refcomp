@@ -445,7 +445,6 @@ impl Expression {
                     Symbol::Procedure(_) => Err("Expected variable, got procedure")
                 },
                 _ => {
-                    println!("Could not dereference {}", pair.as_str());
                     Err("Could not dereference variable")
                 }
             },

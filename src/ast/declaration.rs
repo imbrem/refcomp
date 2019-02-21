@@ -37,7 +37,6 @@ impl<'a> Scoped for Vec<Declaration<'a>> {
 
 pub fn implement_declarations<'a>(declarations : &mut Vec<Declaration<'a>>, sym : &mut SymbolTable)
 -> Result<(), &'static str> {
-    println!("IMPLEMENTING DECLARATIONS!\n\n");
     for decl in declarations {
         match decl {
             Declaration::Function(ref mut s, f) => {
