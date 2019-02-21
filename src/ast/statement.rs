@@ -306,7 +306,10 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Stat
                         conditional_branches : conditional_branches, else_branch : else_branch}))
         },
         Rule::while_loop => {
-            panic!("While loops are not yet implemented!")
+            let mut pairs = pair.into_inner();
+            let cond = Expression::from_pair(pairs.next().unwrap(), sym)?;
+            let scope = parse_bare_scope(pairs.next().unwrap().into_inner().next().unwrap(), sym)?;
+            Ok(Statement::While(While{ condition : cond, scope : scope }))
         },
         Rule::repeat_loop => {
             panic!("Repetition loops are not yet implemented!")
