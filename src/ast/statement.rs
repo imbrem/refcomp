@@ -312,7 +312,10 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Stat
             Ok(Statement::While(While{ condition : cond, scope : scope }))
         },
         Rule::repeat_loop => {
-            panic!("Repetition loops are not yet implemented!")
+            let mut pairs = pair.into_inner();
+            let scope = parse_bare_scope(pairs.next().unwrap().into_inner().next().unwrap(), sym)?;
+            let cond = Expression::from_pair(pairs.next().unwrap(), sym)?;
+            Ok(Statement::Repeat(Repeat{ condition : cond, scope : scope }))
         },
         Rule::return_statement => match pair.into_inner().next() {
             Some(e) => Ok(Statement::Return(Some(Expression::from_pair(e, sym).unwrap()))),
