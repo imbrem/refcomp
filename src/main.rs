@@ -12,6 +12,7 @@ pub mod parser;
 pub mod ast;
 pub mod codegen;
 
+use crate::ast::table::Callable;
 use std::io::{self, Read};
 use pest::Parser;
 
@@ -77,13 +78,38 @@ fn main() -> io::Result<()> {
         println!("Registered {} globals!", cnt);
     }
 
+    println!("Registering procedures...");
+
+    {
+        let mut cnt = 0;
+        for function in scope.get_procedures().iter().cloned() {
+            match compiler.register_function(function.clone()) {
+                Ok(_) => println!("Registered procedure {}", function.get_name()),
+                Err(s) => println!(
+                    "Error registering procedure {}: {}\nProcedure Details: {:#?}",
+                    function.get_name(), s, function
+                )
+            }
+            cnt += 1;
+        }
+        println!("Registered {} procedures!", cnt);
+    }
+
     println!("Registering functions...");
 
     {
         let mut cnt = 0;
         for function in scope.get_functions().iter().cloned() {
-
+            match compiler.register_function(function.clone()) {
+                Ok(_) => println!("Registered function {}", function.get_name()),
+                Err(s) => println!(
+                    "Error registering function {}: {}\nFunction Details: {:#?}",
+                    function.get_name(), s, function
+                )
+            }
+            cnt += 1;
         }
+        println!("Registered {} functions!", cnt);
     }
 
     Ok(())

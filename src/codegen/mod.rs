@@ -165,28 +165,28 @@ impl Compiler {
                     }
                 }.into())
             },
-            Expression::Negation(n) => {
+            Expression::Negation(_n) => {
                 Err("Negation not yet implemented")
             },
-            Expression::Arithmetic(a) => {
+            Expression::Arithmetic(_a) => {
                 Err("Arithmetic operations not yet implemented")
             },
-            Expression::Not(n) => {
+            Expression::Not(_n) => {
                 Err("Logical negation not yet implemented")
             },
-            Expression::Logical(l) => {
+            Expression::Logical(_l) => {
                 Err("Logical operations not yet implemented")
             },
-            Expression::Comparison(c) => {
+            Expression::Comparison(_c) => {
                 Err("Comparisons not yet implemented")
             },
-            Expression::Variable(v) => {
+            Expression::Variable(_v) => {
                 Err("Variables not yet implemented")
             },
-            Expression::ArrayIndex(a) => {
+            Expression::ArrayIndex(_a) => {
                 Err("Array indices not yet implemented")
             },
-            Expression::FunctionCall(f) => {
+            Expression::FunctionCall(_f) => {
                 Err("Function calls not yet implemented")
             }
         }
@@ -215,31 +215,31 @@ impl Compiler {
                 self.builder.build_store(destination, value);
                 Ok(())
             },
-            Statement::Conditional(c) => {
+            Statement::Conditional(_c) => {
                 Err("Conditionals not yet implemented")
             },
-            Statement::While(w) => {
+            Statement::While(_w) => {
                 Err("While loops not yet implemented")
             },
-            Statement::Repeat(r) => {
+            Statement::Repeat(_r) => {
                 Err("Repeat loops not yet implemented")
             },
-            Statement::Break(b) => {
+            Statement::Break(_b) => {
                 Err("Break statements not yet implemented")
             },
-            Statement::Return(r) => {
+            Statement::Return(_r) => {
                 Err("Return statements not yet implemented")
             },
-            Statement::Print(p) => {
+            Statement::Print(_p) => {
                 Err("Print statements not yet implemented")
             },
-            Statement::Input(i) => {
+            Statement::Input(_i) => {
                 Err("Input statements not yet implemented")
             },
-            Statement::ProcedureCall(p) => {
+            Statement::ProcedureCall(_p) => {
                 Err("Procedure calls not yet implemented")
             },
-            Statement::Scope(s) => {
+            Statement::Scope(_s) => {
                 Err("Scope not yet implemented")
             }
         }
