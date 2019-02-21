@@ -292,8 +292,14 @@ impl Compiler {
             Statement::Break(_b) => {
                 Err("Break statements not yet implemented")
             },
-            Statement::Return(_r) => {
-                Err("Return statements not yet implemented")
+            Statement::Return(r) => {
+                match r {
+                    Some(e) => {
+                        let rexpr = self.implement_expression(e)?;
+                        self.builder.build_return(Some(&rexpr))
+                    },
+                    None => self.builder.build_return(None)
+                }; Ok(())
             },
             Statement::Print(_p) => {
                 Err("Print statements not yet implemented")
