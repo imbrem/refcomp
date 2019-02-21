@@ -1,6 +1,9 @@
+use by_address::ByAddress;
 use std::rc::Rc;
 use super::types::{Type, Typed};
 use super::statement::Scope;
+use std::collections::HashSet;
+use std::iter::FromIterator;
 use std::collections::BTreeMap as SymbolMap;
 
 pub trait Callable {
@@ -80,7 +83,17 @@ impl Function {
         }
     }
     pub fn implement(&mut self, scope : Scope) {
-        //TODO: implicit arguments
+        let mut argument_set : HashSet<ByAddress<Rc<Variable>>>
+            = HashSet::from_iter(self.args.iter().cloned().map(|i| ByAddress(i)));
+        let mut iargs = vec![];
+        argument_set.extend(scope.get_variables().iter().cloned().map(|i| ByAddress(i)));
+        scope.visit_dependencies(|v : Rc<Variable>| {
+            let b = ByAddress(v);
+            if argument_set.contains(&b) {
+                iargs.push(b.0)
+            }
+        });
+        self.implicit_args = Some(iargs);
         self.fn_impl = Some(scope);
     }
 }
