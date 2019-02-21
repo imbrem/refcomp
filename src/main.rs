@@ -48,12 +48,12 @@ fn main() -> io::Result<()> {
     let scope = {
         let mut sym = SymbolTable::new();
         match parse_bare_scope(scope, &mut sym) {
-            Some(scope) => {
+            Ok(scope) => {
                 println!("AST:\n{:?}", scope);
                 scope
             },
-            None => {
-                println!("AST construction failed!");
+            Err(s) => {
+                println!("AST construction failed with: {}", s);
                 return Ok(());
             }
         }

@@ -5,6 +5,7 @@ use crate::parser::{Rule};
 use pest::iterators::Pair;
 use std::rc::Rc;
 
+#[derive(Debug)]
 pub enum Declaration {
     Variable(Vec<Rc<Variable>>),
     Function(Rc<Function>),
@@ -34,20 +35,25 @@ impl Scoped for Vec<Declaration> {
     }
 }
 
-fn parse_variable_declaration(pair : Pair<Rule>) -> Option<Declaration> {
-    if pair.as_rule() != Rule::variable_declaration {return None;}
+fn parse_variable_declaration(pair : Pair<Rule>) -> Result<Declaration, &'static str> {
+    if pair.as_rule() != Rule::variable_declaration {
+        return Err("Error parsing variable declaration: wrong rule!");
+    }
     let mut pairs = pair.into_inner();
     let names = pairs.next().unwrap();
     let vtype = parse_type(pairs.next().unwrap()).unwrap();
-    Some(Declaration::Variable(
+    Ok(Declaration::Variable(
         names.into_inner().map(
             |name| Rc::new(Variable::new(name.as_str().to_string(), vtype.clone()))
         ).collect()
     ))
 }
 
-fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Declaration> {
-    if pair.as_rule() != Rule::procedure_declaration {return None;}
+fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable)
+-> Result<Declaration, &'static str> {
+    if pair.as_rule() != Rule::procedure_declaration {
+        return Err("Error parsing procedure declaration: wrong rule");
+    }
     let mut pairs = pair.into_inner();
     let name = pairs.next().unwrap().as_str().to_string();
     let parameter_pairs = pairs.next().unwrap().into_inner();
@@ -69,7 +75,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
             let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
             func.implement(scope);
             func.leave_scope(sym);
-            Some(Declaration::Function(Rc::new(func)))
+            Ok(Declaration::Function(Rc::new(func)))
         },
         None => {
             let mut proc = Function::procedure(name, parameters);
@@ -77,16 +83,16 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
             let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
             proc.implement(scope);
             proc.leave_scope(sym);
-            Some(Declaration::Procedure(Rc::new(proc)))
+            Ok(Declaration::Procedure(Rc::new(proc)))
         },
     }
 }
 
-pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Declaration> {
+pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Declaration, &'static str> {
     match pair.as_rule() {
         Rule::variable_declaration => parse_variable_declaration(pair),
         Rule::procedure_declaration => parse_procedure_declaration(pair, sym),
-        _ => None
+        _ => Err("Error parsing declaration: not a declaration")
     }
 }
 
@@ -222,8 +228,8 @@ mod test {
                 ]));
 
         let mut sym = SymbolTable::new();
-        let decl = parse_declaration(
-            CSC488Parser::parse(Rule::declaration,
+        let outer_scope = parse_bare_scope(
+            CSC488Parser::parse(Rule::bare_scope,
                 "func my_procedure(x, y integer, flag boolean) {
                     func a_nested_function(x, y boolean, n integer) integer {
                         var an_array_variable, another_array_variable [3] boolean
@@ -246,9 +252,12 @@ mod test {
             .unwrap().next().unwrap(),
             &mut sym
         ).unwrap();
-        match decl {
-            Declaration::Procedure(p) => assert_eq!(*p, target_procedure),
-            _ => panic!("Didn't parse a procedure")
-        }
+        assert_eq!(outer_scope.get_variables().len(), 0);
+        assert_eq!(outer_scope.get_functions().len(), 0);
+        assert_eq!(outer_scope.get_statements().len(), 0);
+        let mut decls = outer_scope.get_procedures().iter();
+        let decl = decls.next().unwrap().clone();
+        assert_eq!(Rc::new(target_procedure), decl);
+        assert_eq!(decls.next(), None);
     }
 }

@@ -6,13 +6,15 @@ pub mod table;
 
 use self::table::{SymbolTable, Scoped};
 use self::statement::{Scope};
-use self::declaration::{parse_declaration};
+use self::declaration::{Declaration, parse_declaration};
 use self::statement::{parse_statement};
 use crate::parser::Rule;
 use pest::iterators::Pair;
 
-pub fn parse_bare_scope(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Scope> {
-    if pair.as_rule() != Rule::bare_scope {return None}
+pub fn parse_bare_scope(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Scope, &'static str> {
+    if pair.as_rule() != Rule::bare_scope {
+        return Err("Error parsing bare scope: wrong rule!")
+    }
     let mut pairs = pair.into_inner();
     let first = pairs.next().unwrap();
     let (declarations, statements) = match first.as_rule() {
@@ -30,7 +32,7 @@ pub fn parse_bare_scope(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Sco
         None => Vec::new()
     };
     declarations.leave_scope(sym);
-    Some(Scope::new(statements, declarations))
+    Ok(Scope::new(statements, declarations))
 }
 
 #[cfg(test)]
@@ -59,7 +61,7 @@ mod test {
             ).unwrap());
         assert_eq!(
             simple_bare_scope,
-            Some(Scope::new_from_symbols(
+            Ok(Scope::new_from_symbols(
                 vec![Statement::Assignment(goal_assignment)], vec![Symbol::Variable(goal_variable)]))
         )
     }

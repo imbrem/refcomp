@@ -170,12 +170,15 @@ impl SymbolTable {
         }
     }
     pub fn define(&mut self, symbol : Symbol) {
+        println!("Defining symbol {:?}", symbol);
         self.reference(symbol.get_name().to_string(), symbol)
     }
     pub fn reference(&mut self, name : String, symbol : Symbol) {
+        println!("Referencing name {} to symbol {:?}", name, symbol);
         self.symbols.entry(name).or_insert(Vec::with_capacity(1)).push(symbol);
     }
     pub fn undef(&mut self, name : &str) -> Option<Symbol> {
+        println!("Undefining name {}", name);
         match self.symbols.get_mut(name) {
             Some(v) => v.pop(),
             None => None

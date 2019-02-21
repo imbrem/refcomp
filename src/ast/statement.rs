@@ -267,25 +267,22 @@ impl DependencyVisitor for OutputElement {
     }
 }
 
-fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Option<Statement> {
+fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Result<Statement, &'static str> {
     let mut pairs = pair.into_inner();
     let variable = pairs.next().unwrap();
-    let expression = match Expression::from_pair(pairs.next().unwrap(), sym) {
-        Ok(exp) => exp,
-        _ => {return None}
-    };
+    let expression = Expression::from_pair(pairs.next().unwrap(), sym)?;
     match variable.as_rule() {
         Rule::array_index => panic!("Array index assignment not yet implemented!"),
         Rule::identifier => match sym.dereference(variable.as_str()) {
             Some(Symbol::Variable(v)) =>
-                Some(Statement::Assignment(Assignment::to_variable(v, expression))),
-            _ => None
+                Ok(Statement::Assignment(Assignment::to_variable(v, expression))),
+            _ => Err("Cannot find variable")
         },
-        _ => None
+        _ => Err("Invalid assignment statement")
     }
 }
 
-pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Statement> {
+pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Statement, &'static str> {
     match pair.as_rule() {
         Rule::assignment => parse_assignment(pair, sym),
         Rule::conditional => {
@@ -300,11 +297,12 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
                     ConditionalBranch{condition : expression, scope : scope}
                 }).collect();
             let else_branch = match pairs.next() {
-                Some(e) =>
-                parse_bare_scope(e.into_inner().next().unwrap().into_inner().next().unwrap(), sym),
+                Some(e) => Some(parse_bare_scope(
+                    e.into_inner().next().unwrap().into_inner().next().unwrap(), sym
+                )?),
                 None => None
             };
-            Some(Statement::Conditional(Conditional{
+            Ok(Statement::Conditional(Conditional{
                         conditional_branches : conditional_branches, else_branch : else_branch}))
         },
         Rule::while_loop => {
@@ -314,8 +312,8 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
             panic!("Repetition loops are not yet implemented!")
         },
         Rule::return_statement => match pair.into_inner().next() {
-            Some(e) => Some(Statement::Return(Some(Expression::from_pair(e, sym).unwrap()))),
-            None => Some(Statement::Return(None))
+            Some(e) => Ok(Statement::Return(Some(Expression::from_pair(e, sym).unwrap()))),
+            None => Ok(Statement::Return(None))
         },
         Rule::print_statement => {
             let outputs = pair.into_inner().next().unwrap().into_inner().map(|o| {
@@ -334,7 +332,7 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
                         OutputElement::Newline
                     }
                 });
-            Some(Statement::Print(outputs.collect()))
+            Ok(Statement::Print(outputs.collect()))
         },
         Rule::input_statement => {
             panic!("Input is not yet implemented!")
@@ -342,25 +340,20 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Option<Stat
         Rule::procedure_call => {
             let mut pairs = pair.into_inner();
             let name = pairs.next().unwrap().as_str();
-            let procedure = match sym.dereference(name)? {
-                Symbol::Procedure(p) => p,
-                _ => {return None}
+            let procedure = match sym.dereference(name) {
+                Some(Symbol::Procedure(p)) => p,
+                Some(_) => {return Err("Error building procedure call: symbol not a procedure")},
+                _ => {return Err("Error building procedure call: symbol undefined")}
             };
             let args = match pairs.next() {
-                Some(args) => match parse_arguments(args, sym) {
-                    Ok(args) => args,
-                    _ => {return None}
-                },
+                Some(args) => parse_arguments(args, sym)?,
                 None => Vec::new()
             };
-            match ProcedureCall::new(procedure, args) {
-                Ok(s) => Some(s),
-                _ => None
-            }
+            ProcedureCall::new(procedure, args)
         },
-        Rule::scope => Some(
+        Rule::scope => Ok(
             Statement::Scope(parse_bare_scope(pair.into_inner().next().unwrap(), sym).unwrap())
         ),
-        _ => None
+        _ => Err("Invalid statement")
     }
 }

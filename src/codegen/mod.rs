@@ -121,14 +121,34 @@ impl Compiler {
         let new_global = self.module.add_global(
             self.get_llvm_type(var.get_type()).unwrap(),
             Some(AddressSpace::Generic), var.get_name());
-        let pointer_to_global = new_global.as_pointer_value();
         self.globals.insert(ByAddress(var.clone()), new_global);
-        self.variables.insert(ByAddress(var), pointer_to_global);
+    }
+
+    fn get_implicit_arg_type(&self, typ : Type) -> Result<BasicTypeEnum, &'static str> {
+        let base_type = match self.get_llvm_type(typ) {
+            Some(typ) => typ,
+            None => {return Err("Error!");}
+        };
+        match base_type {
+            BasicTypeEnum::IntType(i) => Ok(i.ptr_type(AddressSpace::Generic).into()),
+            _ => Ok(base_type)
+        }
     }
 
     fn get_param_types(&self, func : &Rc<Function>)
     -> Result<Vec<BasicTypeEnum>, &'static str> {
-        func.get_params().iter().map(|t| self.get_param_type(t.get_type())).collect()
+        let res : Result<Vec<BasicTypeEnum>, &'static str> = func.get_params().iter()
+            .map(|t| self.get_param_type(t.get_type()))
+            .collect();
+        let mut res = res?;
+        if let Some(args) = func.get_implicit_args() {
+            for arg in args.iter().cloned().map(|v| ByAddress(v)) {
+                if self.globals.get(&arg) == None {
+                    res.push(self.get_implicit_arg_type(arg.get_type())?)
+                }
+            }
+        }
+        Ok(res)
     }
 
     pub fn register_function(&mut self, func : Rc<Function>)
@@ -262,8 +282,24 @@ impl Compiler {
         }
     }
 
+    fn clear_variables(&mut self) {
+        self.variables.clear();
+    }
+
     pub fn compile_fn(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str>
     {
+        let scope = match func.get_scope() {
+            Some(scope) => scope,
+            None => {return Err("Cannot get scope!");}
+        };
+        // FIRST: compile all nested functions and procedures
+        for f in scope.get_functions().iter().cloned() {
+            self.compile_fn(f)?;
+        }
+        for p in scope.get_procedures().iter().cloned() {
+            self.compile_fn(p)?;
+        }
+
         // Search for the prototype, or compile a new one
         let proto = self.get_function(func.clone()).unwrap();
 
@@ -274,7 +310,9 @@ impl Compiler {
         let entry = self.context.append_basic_block(&proto, "entry");
         self.builder.position_at_end(&entry);
         // Register argument variables and name associated arguments, then store to variables
-        for (var, param) in func.get_params().iter().zip(proto.get_param_iter()) {
+        let mut param_iter = proto.get_param_iter();
+        for var in func.get_params().iter() {
+            let param = param_iter.next().unwrap();
             match param {
                 BasicValueEnum::FloatValue(f) => f.set_name(var.get_name()),
                 BasicValueEnum::IntValue(i) => i.set_name(var.get_name()),
@@ -283,6 +321,26 @@ impl Compiler {
             let alloca = self.register_variable(var.clone(), Some(&entry));
             self.builder.build_store(alloca, param);
         }
+        // Now, for each implicit argument, if it's a global, put the global in the symbol table,
+        // otherwise, make a store
+        if let Some(iargs) = func.get_implicit_args() {
+            println!("IARGS DETECTED: {:#?}", iargs);
+            for var in iargs.iter().cloned() {
+                let ba = ByAddress(var);
+                if let Some(global) = self.globals.get(&ba) {
+                    self.variables.insert(ba, global.as_pointer_value());
+                } else {
+                    let param = param_iter.next().unwrap();
+                    let pv = match param {
+                        BasicValueEnum::PointerValue(p) => {
+                            p.set_name(ba.get_name()); p
+                        },
+                        _ => {return Err("Invalid implicit parameter type!")}
+                    };
+                    self.variables.insert(ba, pv);
+                }
+            }
+        }
 
         // Compile the body
         let scope = match func.get_scope() {
@@ -290,6 +348,10 @@ impl Compiler {
             None => Err("Tried to compile function without scope!")
         }?;
         self.implement_scope(scope)?;
+
+        // Clean up by de-registering all variables
+        self.clear_variables();
+
         Ok(proto)
     }
 }
