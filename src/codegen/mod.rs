@@ -1,4 +1,4 @@
-// Inspired by, and bassed off, the Kaleidoscope tutorial in Inkwell found at
+// Inspired by, and based off, the Kaleidoscope tutorial in Inkwell found at
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
