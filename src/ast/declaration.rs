@@ -6,33 +6,63 @@ use pest::iterators::Pair;
 use std::rc::Rc;
 
 #[derive(Debug)]
-pub enum Declaration {
+pub enum Declaration<'a> {
     Variable(Vec<Rc<Variable>>),
-    Function(Rc<Function>),
-    Procedure(Rc<Function>)
+    Function(Option<Pair<'a, Rule>>, Rc<Function>),
+    Procedure(Option<Pair<'a, Rule>>, Rc<Function>)
 }
 
-impl Scoped for Declaration {
+impl<'a> Scoped for Declaration<'a> {
     fn enter_scope(&self, sym: &mut SymbolTable) {match self {
             Declaration::Variable(vars) => for var in vars.iter() {
                 sym.define(Symbol::Variable(var.clone()))},
-            Declaration::Function(f) => sym.define(Symbol::Function(f.clone())),
-            Declaration::Procedure(p) => sym.define(Symbol::Procedure(p.clone()))
+            Declaration::Function(_, f) => sym.define(Symbol::Function(f.clone())),
+            Declaration::Procedure(_, p) => sym.define(Symbol::Procedure(p.clone()))
     }}
     fn leave_scope(&self, sym : &mut SymbolTable) {match self {
             Declaration::Variable(vars) => for var in vars.iter() {sym.undef(var.get_name());},
-            Declaration::Function(f) => {sym.undef(f.get_name());},
-            Declaration::Procedure(p) => {sym.undef(p.get_name());}
+            Declaration::Function(_, f) => {sym.undef(f.get_name());},
+            Declaration::Procedure(_, p) => {sym.undef(p.get_name());}
     }}
 }
 
-impl Scoped for Vec<Declaration> {
+impl<'a> Scoped for Vec<Declaration<'a>> {
     fn enter_scope(&self, sym : &mut SymbolTable) {
         for decl in self.iter() {decl.enter_scope(sym);}
     }
     fn leave_scope(&self, sym : &mut SymbolTable) {
         for decl in self.iter().rev() {decl.leave_scope(sym);}
     }
+}
+
+pub fn implement_declarations<'a>(declarations : &mut Vec<Declaration<'a>>, sym : &mut SymbolTable)
+-> Result<(), &'static str> {
+    println!("IMPLEMENTING DECLARATIONS!\n\n");
+    for decl in declarations {
+        match decl {
+            Declaration::Function(ref mut s, f) => {
+                let mut scope = None;
+                std::mem::swap(&mut scope, s);
+                if let Some(scope) = scope {
+                    f.enter_scope(sym);
+                    f.implement(parse_bare_scope(scope, sym)?);
+                    f.leave_scope(sym);
+                } else {return Err("Tried to implement function without scope!");}
+            },
+            Declaration::Procedure(ref mut s, p) => {
+                let mut scope = None;
+                std::mem::swap(&mut scope, s);
+                if let Some(scope) = scope {
+                    p.enter_scope(sym);
+                    p.implement(parse_bare_scope(scope, sym)?);
+                    p.leave_scope(sym);
+                }
+                else {return Err("Tried to implement function without scope!");}
+            },
+            _ => {}
+        }
+    }
+    Ok(())
 }
 
 fn parse_variable_declaration(pair : Pair<Rule>) -> Result<Declaration, &'static str> {
@@ -49,8 +79,8 @@ fn parse_variable_declaration(pair : Pair<Rule>) -> Result<Declaration, &'static
     ))
 }
 
-fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable)
--> Result<Declaration, &'static str> {
+fn parse_procedure_declaration<'a>(pair : Pair<'a, Rule>, _sym : &mut SymbolTable)
+-> Result<Declaration<'a>, &'static str> {
     if pair.as_rule() != Rule::procedure_declaration {
         return Err("Error parsing procedure declaration: wrong rule");
     }
@@ -70,25 +100,20 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable)
     let scope = pairs.next().unwrap(); //TODO: parse
     match rtype {
         Some(t) => {
-            let mut func = Function::new(name, parameters, t);
-            func.enter_scope(sym);
-            let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
-            func.implement(scope);
-            func.leave_scope(sym);
-            Ok(Declaration::Function(Rc::new(func)))
+            let func = Rc::new(Function::new(name, parameters, t));
+            let scope = scope.into_inner().next().unwrap();
+            Ok(Declaration::Function(Some(scope), func))
         },
         None => {
-            let mut proc = Function::procedure(name, parameters);
-            proc.enter_scope(sym);
-            let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
-            proc.implement(scope);
-            proc.leave_scope(sym);
-            Ok(Declaration::Procedure(Rc::new(proc)))
+            let proc = Rc::new(Function::procedure(name, parameters));
+            let scope = scope.into_inner().next().unwrap();
+            Ok(Declaration::Procedure(Some(scope), proc))
         },
     }
 }
 
-pub fn parse_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Declaration, &'static str> {
+pub fn parse_declaration<'a>(pair : Pair<'a, Rule>, sym : &mut SymbolTable)
+    -> Result<Declaration<'a>, &'static str> {
     match pair.as_rule() {
         Rule::variable_declaration => parse_variable_declaration(pair),
         Rule::procedure_declaration => parse_procedure_declaration(pair, sym),
@@ -130,7 +155,7 @@ mod test {
 
     #[test]
     fn procedure_and_function_declarations_parse_properly() {
-        let mut target_procedure = Function::procedure(
+        let target_procedure = Function::procedure(
             "my_procedure".to_string(),
             vec![
                 Rc::new(Variable::integer("x".to_string())),
@@ -140,7 +165,7 @@ mod test {
         let param_x = Rc::new(Variable::boolean("x".to_string()));
         let param_y = Rc::new(Variable::boolean("y".to_string()));
         let param_n = Rc::new(Variable::integer("n".to_string()));
-        let mut target_function = Function::new(
+        let target_function = Function::new(
             "a_nested_function".to_string(),
             vec![
                 param_x.clone(),

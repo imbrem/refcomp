@@ -4,13 +4,14 @@ use super::types::{Type, Typed};
 use super::statement::Scope;
 use std::collections::HashSet;
 use std::iter::FromIterator;
+use std::cell::{Ref, RefCell};
 use std::collections::BTreeMap as SymbolMap;
+use std::ops::Deref;
 
 pub trait Callable {
     fn get_name(&self) -> &str;
     fn get_arity(&self) -> usize;
     fn get_params(&self) -> &Vec<Rc<Variable>>;
-    fn get_scope(&self) -> Option<&Scope>;
     fn get_return(&self) -> Type;
 }
 
@@ -57,32 +58,33 @@ impl Typed for Variable {
 pub struct Function {
     name : String,
     args : Vec<Rc<Variable>>,
-    implicit_args : Option<Vec<Rc<Variable>>>,
+    implicit_args : RefCell<Vec<Rc<Variable>>>,
     ret_type : Type,
-    fn_impl : Option<Scope>
+    fn_impl : RefCell<Option<Scope>>
 }
 
 impl Function {
     pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type)
     -> Function {Function{
-        name : name, args : args, ret_type : ret_type, implicit_args : None, fn_impl : None
+        name : name,
+        args : args,
+        ret_type : ret_type,
+        implicit_args : RefCell::new(vec![]),
+        fn_impl : RefCell::new(None)
     }}
     pub fn procedure(name : String, args : Vec<Rc<Variable>>) -> Function {
         Function::new(name, args, Type::Void)
     }
     pub fn with_impl(name : String, args : Vec<Rc<Variable>>, ret_type : Type, fn_impl : Scope)
     -> Function {
-        let mut result = Function::new(name, args, ret_type);
+        let result = Function::new(name, args, ret_type);
         result.implement(fn_impl);
         return result
     }
-    pub fn get_implicit_args(&self) -> Option<&Vec<Rc<Variable>>> {
-        match &self.implicit_args {
-            Some(args) => Some(args),
-            None => None
-        }
+    pub fn get_implicit_args(&self) -> Ref<Vec<Rc<Variable>>> {
+        self.implicit_args.borrow()
     }
-    pub fn implement(&mut self, scope : Scope) {
+    pub fn implement(&self, scope : Scope) {
         let mut argument_set : HashSet<ByAddress<Rc<Variable>>>
             = HashSet::from_iter(self.args.iter().cloned().map(|i| ByAddress(i)));
         let mut iargs = vec![];
@@ -93,16 +95,17 @@ impl Function {
                 iargs.push(b.0)
             }
         });
-        self.implicit_args = Some(iargs);
-        self.fn_impl = Some(scope);
+        self.implicit_args.replace(iargs);
+        self.fn_impl.replace(Some(scope));
+    }
+    pub fn get_scope(&self) -> Ref<Option<Scope>> {
+        self.fn_impl.borrow()
     }
 }
 
 impl DependencyVisitor for Function {
     fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
-        if let Some(args) = &self.implicit_args {
-            for arg in args {visitor = arg.visit_dependencies(visitor)}
-        }
+        for arg in self.get_implicit_args().iter() {visitor = arg.visit_dependencies(visitor)}
         visitor
     }
 }
@@ -110,7 +113,6 @@ impl DependencyVisitor for Function {
 impl Callable for Function {
     fn get_arity(&self) -> usize {self.args.len()}
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
-    fn get_scope(&self) -> Option<&Scope> {self.fn_impl.as_ref()}
     fn get_return(&self) -> Type {self.ret_type.clone()}
     fn get_name(&self) -> &str {&self.name}
 }
@@ -122,10 +124,10 @@ impl Typed for Function {
 impl Scoped for Function {
     fn enter_scope(&self, sym: &mut SymbolTable) {
         for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
-        if let Some(s) = &self.fn_impl {s.enter_scope(sym);}
+        if let Some(s) = self.fn_impl.borrow().deref() {s.enter_scope(sym);}
     }
     fn leave_scope(&self, sym : &mut SymbolTable) {
-        if let Some(s) = &self.fn_impl {s.leave_scope(sym);}
+        if let Some(s) = self.fn_impl.borrow().deref() {s.leave_scope(sym);}
         for arg in &self.args {sym.undef(arg.get_name());}
     }
 }

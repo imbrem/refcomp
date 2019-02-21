@@ -14,6 +14,8 @@ use crate::ast::types::{Type, ScalarType, Typed};
 use crate::ast::statement::*;
 use by_address::ByAddress;
 
+use std::ops::Deref;
+
 use inkwell::{
     context::Context,
     builder::Builder,
@@ -141,11 +143,9 @@ impl Compiler {
             .map(|t| self.get_param_type(t.get_type()))
             .collect();
         let mut res = res?;
-        if let Some(args) = func.get_implicit_args() {
-            for arg in args.iter().cloned().map(|v| ByAddress(v)) {
-                if self.globals.get(&arg) == None {
-                    res.push(self.get_implicit_arg_type(arg.get_type())?)
-                }
+        for arg in func.get_implicit_args().iter().cloned().map(|v| ByAddress(v)) {
+            if self.globals.get(&arg) == None {
+                res.push(self.get_implicit_arg_type(arg.get_type())?)
             }
         }
         Ok(res)
@@ -288,10 +288,13 @@ impl Compiler {
 
     pub fn compile_fn(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str>
     {
-        let scope = match func.get_scope() {
-            Some(scope) => scope,
-            None => {return Err("Cannot get scope!");}
-        };
+        // Get the scope
+        let sref = func.get_scope();
+        let scope = match sref.deref() {
+            Some(scope) => Ok(scope),
+            None => Err("Tried to compile function without scope!")
+        }?;
+
         // FIRST: compile all nested functions and procedures
         for f in scope.get_functions().iter().cloned() {
             self.compile_fn(f)?;
@@ -323,30 +326,23 @@ impl Compiler {
         }
         // Now, for each implicit argument, if it's a global, put the global in the symbol table,
         // otherwise, make a store
-        if let Some(iargs) = func.get_implicit_args() {
-            println!("IARGS DETECTED: {:#?}", iargs);
-            for var in iargs.iter().cloned() {
-                let ba = ByAddress(var);
-                if let Some(global) = self.globals.get(&ba) {
-                    self.variables.insert(ba, global.as_pointer_value());
-                } else {
-                    let param = param_iter.next().unwrap();
-                    let pv = match param {
-                        BasicValueEnum::PointerValue(p) => {
-                            p.set_name(ba.get_name()); p
-                        },
-                        _ => {return Err("Invalid implicit parameter type!")}
-                    };
-                    self.variables.insert(ba, pv);
-                }
+        for var in func.get_implicit_args().iter().cloned() {
+            let ba = ByAddress(var);
+            if let Some(global) = self.globals.get(&ba) {
+                self.variables.insert(ba, global.as_pointer_value());
+            } else {
+                let param = param_iter.next().unwrap();
+                let pv = match param {
+                    BasicValueEnum::PointerValue(p) => {
+                        p.set_name(ba.get_name()); p
+                    },
+                    _ => {return Err("Invalid implicit parameter type!")}
+                };
+                self.variables.insert(ba, pv);
             }
         }
 
         // Compile the body
-        let scope = match func.get_scope() {
-            Some(scope) => Ok(scope),
-            None => Err("Tried to compile function without scope!")
-        }?;
         self.implement_scope(scope)?;
 
         // Clean up by de-registering all variables

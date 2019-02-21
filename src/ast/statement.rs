@@ -144,8 +144,8 @@ impl Scope {
         for decl in declarations {
             match decl {
                 Declaration::Variable(vars) => for var in vars {result.variables.push(var)},
-                Declaration::Function(f) => result.functions.push(f),
-                Declaration::Procedure(p) => result.procedures.push(p)
+                Declaration::Function(_, f) => result.functions.push(f),
+                Declaration::Procedure(_, p) => result.procedures.push(p)
             }
         }
         result

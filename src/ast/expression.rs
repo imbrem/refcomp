@@ -440,7 +440,10 @@ impl Expression {
                     Symbol::Function(_) => Err("Expected variable, got function"),
                     Symbol::Procedure(_) => Err("Expected variable, got procedure")
                 },
-                _ => Err("Could not dereference variable")
+                _ => {
+                    println!("Could not dereference {}", pair.as_str());
+                    Err("Could not dereference variable")
+                }
             },
             _ => panic!("{:?} is not a valid primary expression!", pair)
         }
