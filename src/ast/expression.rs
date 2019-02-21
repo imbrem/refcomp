@@ -66,9 +66,9 @@ pub enum ArithmeticOp {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arithmetic {
-    lhs : Box<Expression>,
-    rhs : Box<Expression>,
-    op : ArithmeticOp
+    pub lhs : Box<Expression>,
+    pub rhs : Box<Expression>,
+    pub op : ArithmeticOp
 }
 
 impl Arithmetic {

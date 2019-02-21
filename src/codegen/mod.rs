@@ -2,7 +2,7 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
-use crate::ast::expression::{Constant, Expression, UnaryExpression};
+use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp};
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
@@ -196,8 +196,31 @@ impl Compiler {
                     _ => Err("Error constructing negation: invalid type")
                 }
             },
-            Expression::Arithmetic(_a) => {
-                Err("Arithmetic operations not yet implemented")
+            Expression::Arithmetic(a) => {
+                let lhs_expr = self.implement_expression(&a.lhs)?;
+                let rhs_expr = self.implement_expression(&a.rhs)?;
+                match (a.lhs.get_type(), a.rhs.get_type()) {
+                    (Type::ScalarType(ScalarType::Integer), Type::ScalarType(ScalarType::Integer))
+                    => {
+                        let ilhs = lhs_expr.into_int_value();
+                        let irhs = rhs_expr.into_int_value();
+                        Ok(match a.op {
+                            ArithmeticOp::Add => {
+                                self.builder.build_int_add(ilhs, irhs, "addtmp")
+                            },
+                            ArithmeticOp::Mul => {
+                                self.builder.build_int_mul(ilhs, irhs, "multmp")
+                            },
+                            ArithmeticOp::Sub => {
+                                self.builder.build_int_sub(ilhs, irhs, "subtmp")
+                            },
+                            ArithmeticOp::Div => {
+                                self.builder.build_int_signed_div(ilhs, irhs, "divtmp")
+                            }
+                        }.into())
+                    },
+                    _ => Err("Error constructing arithmetic operation: invalid types")
+                }
             },
             Expression::Not(n) => {
                 println!("HERE");
