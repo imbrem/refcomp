@@ -2,7 +2,7 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
-use crate::ast::expression::{Constant, Expression};
+use crate::ast::expression::{Constant, Expression, UnaryExpression};
 use crate::ast::statement::Statement;
 use inkwell::types::BasicTypeEnum;
 use inkwell::AddressSpace;
@@ -185,8 +185,15 @@ impl Compiler {
                     }
                 }.into())
             },
-            Expression::Negation(_n) => {
-                Err("Negation not yet implemented")
+            Expression::Negation(n) => {
+                match n.get_type() {
+                    Type::ScalarType(ScalarType::Integer) => {
+                        let arg_expr = self.implement_expression(n.get())?;
+                        let int_expr = arg_expr.into_int_value();
+                        Ok(self.builder.build_int_neg(int_expr, "negtmp").into())
+                    },
+                    _ => Err("Error constructing negation: invalid type")
+                }
             },
             Expression::Arithmetic(_a) => {
                 Err("Arithmetic operations not yet implemented")

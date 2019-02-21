@@ -3,6 +3,7 @@ use super::types::{Type, Typed, ScalarType, ArrayType};
 use crate::parser::{Rule, BINARY_PRECEDENCE_CLIMBER, LOGICAL_PRECEDENCE_CLIMBER};
 use pest::iterators::{Pair};
 use std::rc::Rc;
+use std::ops::Deref;
 type EPResult = Result<Expression, &'static str>;
 type FResult = Result<Constant, &'static str>;
 
@@ -11,6 +12,7 @@ pub trait UnaryFolder {
 }
 pub trait UnaryExpression {
     fn new(expr : Expression) -> EPResult;
+    fn get(&self) -> &Expression;
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -37,6 +39,7 @@ impl UnaryExpression for Negation {
             }
         }
     }
+    fn get(&self) -> &Expression {self.arg.deref()}
 }
 
 impl UnaryFolder for Negation {
@@ -122,6 +125,7 @@ impl UnaryExpression for Not {
             }
         }
     }
+    fn get(&self) -> &Expression {self.arg.deref()}
 }
 
 impl UnaryFolder for Not {
