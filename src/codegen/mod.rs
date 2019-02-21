@@ -207,8 +207,9 @@ impl Compiler {
             Expression::Comparison(_c) => {
                 Err("Comparisons not yet implemented")
             },
-            Expression::Variable(_v) => {
-                Err("Variables not yet implemented")
+            Expression::Variable(v) => {
+                let ptr = self.get_variable(v.clone());
+                Ok(self.builder.build_load(ptr, "loadtmp"))
             },
             Expression::ArrayIndex(_a) => {
                 Err("Array indices not yet implemented")

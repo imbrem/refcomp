@@ -448,6 +448,13 @@ impl Expression {
                     Err("Could not dereference variable")
                 }
             },
+            Rule::negation_expression => {
+                let mut arg_pairs = pair.into_inner();
+                arg_pairs.next();
+                let arg_pair = arg_pairs.next().unwrap();
+                let arg = Expression::from_pair(arg_pair, sym)?;
+                Negation::new(arg)
+            },
             _ => panic!("{:?} is not a valid primary expression!", pair)
         }
     }
@@ -497,7 +504,9 @@ impl Expression {
     }
 
     pub fn from_pair(pair : Pair<Rule>, sym : &SymbolTable) -> EPResult {
-        if pair.as_rule() != Rule::expression {return Err("Not an expression");}
+        if pair.as_rule() != Rule::expression {
+            panic!("Pair {:?} is not a valid expression!", pair);
+        }
         let logical_primary = |pair : Pair<Rule>| {Self::parse_logical_primary(pair, sym)};
         let merge_logical = |lhs : EPResult, op : Pair<Rule>, rhs : EPResult|
             -> EPResult {
