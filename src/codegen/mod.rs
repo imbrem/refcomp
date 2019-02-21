@@ -239,18 +239,19 @@ impl Compiler {
             Statement::ProcedureCall(_p) => {
                 Err("Procedure calls not yet implemented")
             },
-            Statement::Scope(_s) => {
-                Err("Scope not yet implemented")
+            Statement::Scope(s) => {
+                self.implement_scope(s)
             }
         }
     }
 
-    fn implement_scope(&mut self, scope : &Scope, func : FunctionValue)
-    -> Result<FunctionValue, &'static str> {
+    fn implement_scope(&mut self, scope : &Scope)
+    -> Result<(), &'static str> {
         // Register all variables
         for var in scope.get_variables().iter().cloned() {self.register_variable(var, None);}
+        // TODO: deal with nested functions and procedures
         for statement in scope.get_statements() {self.implement_statement(statement)?}
-        Ok(func)
+        Ok(())
     }
 
     pub fn get_function(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str> {
@@ -288,6 +289,7 @@ impl Compiler {
             Some(scope) => Ok(scope),
             None => Err("Tried to compile function without scope!")
         }?;
-        self.implement_scope(scope, proto)
+        self.implement_scope(scope)?;
+        Ok(proto)
     }
 }
