@@ -77,5 +77,14 @@ fn main() -> io::Result<()> {
         println!("Registered {} globals!", cnt);
     }
 
+    println!("Registering functions...");
+
+    {
+        let mut cnt = 0;
+        for function in scope.get_functions().iter().cloned() {
+
+        }
+    }
+
     Ok(())
 }

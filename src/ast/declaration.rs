@@ -1,4 +1,4 @@
-use super::table::{Variable, Function, Procedure, SymbolTable, Symbol, Scoped, Callable};
+use super::table::{Variable, Function, SymbolTable, Symbol, Scoped, Callable};
 use super::types::{parse_type};
 use super::{parse_bare_scope};
 use crate::parser::{Rule};
@@ -8,7 +8,7 @@ use std::rc::Rc;
 pub enum Declaration {
     Variable(Vec<Rc<Variable>>),
     Function(Rc<Function>),
-    Procedure(Rc<Procedure>)
+    Procedure(Rc<Function>)
 }
 
 impl Scoped for Declaration {
@@ -72,7 +72,7 @@ fn parse_procedure_declaration(pair : Pair<Rule>, sym : &mut SymbolTable) -> Opt
             Some(Declaration::Function(Rc::new(func)))
         },
         None => {
-            let mut proc = Procedure::new(name, parameters);
+            let mut proc = Function::procedure(name, parameters);
             proc.enter_scope(sym);
             let scope = parse_bare_scope(scope.into_inner().next().unwrap(), sym).unwrap();
             proc.implement(scope);
@@ -124,7 +124,7 @@ mod test {
 
     #[test]
     fn procedure_and_function_declarations_parse_properly() {
-        let mut target_procedure = Procedure::new(
+        let mut target_procedure = Function::procedure(
             "my_procedure".to_string(),
             vec![
                 Rc::new(Variable::integer("x".to_string())),

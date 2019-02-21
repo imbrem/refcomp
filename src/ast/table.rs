@@ -16,7 +16,7 @@ pub trait Scoped {
     fn leave_scope(&self, sym : &mut SymbolTable);
 }
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Variable {
     var_type : Type,
     name : String
@@ -39,7 +39,7 @@ impl Typed for Variable {
     fn get_type(&self) -> Type {return self.var_type.clone()}
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Function {
     name : String,
     args : Vec<Rc<Variable>>,
@@ -51,6 +51,13 @@ impl Function {
     pub fn new(name : String, args : Vec<Rc<Variable>>, ret_type : Type)
     -> Function {Function{
         name : name, args : args, ret_type : ret_type, fn_impl : None
+    }}
+    pub fn procedure(name : String, args : Vec<Rc<Variable>>) -> Function {
+        Function::new(name, args, Type::Void)
+    }
+    pub fn with_impl(name : String, args : Vec<Rc<Variable>>, ret_type : Type, fn_impl : Scope)
+    -> Function {Function{
+        name : name, args : args, ret_type : ret_type, fn_impl : Some(fn_impl)
     }}
     pub fn implement(&mut self, scope : Scope) {
         self.fn_impl = Some(scope);
@@ -80,46 +87,11 @@ impl Scoped for Function {
     }
 }
 
-#[derive(Debug, PartialEq)]
-pub struct Procedure {
-    name : String,
-    args : Vec<Rc<Variable>>,
-    pr_impl : Option<Scope>
-}
-
-impl Procedure {
-    pub fn new(name : String, args : Vec<Rc<Variable>>) -> Procedure {
-        Procedure{name : name, args : args, pr_impl : None}
-    }
-    pub fn implement(&mut self, scope : Scope) {
-        self.pr_impl = Some(scope);
-    }
-}
-
-impl Callable for Procedure {
-    fn get_arity(&self) -> usize {self.args.len()}
-    fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
-    fn get_scope(&self) -> Option<&Scope> {self.pr_impl.as_ref()}
-    fn get_return(&self) -> Type {Type::Void}
-    fn get_name(&self) -> &str {&self.name}
-}
-
-impl Scoped for Procedure {
-    fn enter_scope(&self, sym: &mut SymbolTable) {
-        for arg in &self.args {sym.define(Symbol::Variable(arg.clone()))}
-        if let Some(s) = &self.pr_impl {s.enter_scope(sym);}
-    }
-    fn leave_scope(&self, sym : &mut SymbolTable) {
-    if let Some(s) = &self.pr_impl {s.leave_scope(sym);}
-        for arg in &self.args {sym.undef(arg.get_name());}
-    }
-}
-
 #[derive(Clone, PartialEq, Debug)]
 pub enum Symbol {
     Variable(Rc<Variable>),
     Function(Rc<Function>),
-    Procedure(Rc<Procedure>)
+    Procedure(Rc<Function>)
 }
 
 impl Symbol {

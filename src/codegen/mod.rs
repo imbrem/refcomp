@@ -2,13 +2,14 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
+use crate::ast::expression::{Constant, Expression};
 use crate::ast::statement::Statement;
 use inkwell::types::BasicTypeEnum;
 use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-use crate::ast::table::{Variable, Callable};
+use crate::ast::table::{Variable, Function, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
 use crate::ast::statement::{Scope};
 use by_address::ByAddress;
@@ -30,6 +31,7 @@ pub struct Compiler {
     pub module : Module,
     builder : Builder,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
+    functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
     globals : HashMap<ByAddress<Rc<Variable>>, GlobalValue>,
     curr_fn : Option<FunctionValue>
 }
@@ -70,14 +72,10 @@ impl Compiler {
             module : module,
             builder : builder,
             variables : HashMap::new(),
+            functions : HashMap::new(),
             globals : HashMap::new(),
             curr_fn : None
         }
-    }
-
-    #[inline]
-    fn get_fn(&self, name : &str) -> Option<FunctionValue> {
-        self.module.get_function(name)
     }
 
     // Code mostly taken from:
@@ -128,12 +126,12 @@ impl Compiler {
         self.variables.insert(ByAddress(var), pointer_to_global);
     }
 
-    fn get_param_types<T: Callable>(&self, func : &Rc<T>)
+    fn get_param_types(&self, func : &Rc<Function>)
     -> Result<Vec<BasicTypeEnum>, &'static str> {
         func.get_params().iter().map(|t| self.get_param_type(t.get_type())).collect()
     }
 
-    fn compile_prototype<T: Callable>(&mut self, func : Rc<T>)
+    pub fn register_function(&mut self, func : Rc<Function>)
     -> Result<FunctionValue, &'static str> {
         // Get function type
         let atypes = self.get_param_types(&func)?;
@@ -149,26 +147,85 @@ impl Compiler {
         };
         // Create the function
         let fn_val = self.module.add_function(func.get_name(), function_type, None);
-        // Set it as the current function
-        self.curr_fn = Some(fn_val);
-        // Create an entry block and point the builder to it's end
-        let entry = self.context.append_basic_block(&fn_val, "entry");
-        self.builder.position_at_end(&entry);
-        // Register argument variables and name associated arguments, then store to variables
-        for (var, param) in func.get_params().iter().zip(fn_val.get_param_iter()) {
-            match param {
-                BasicValueEnum::FloatValue(f) => f.set_name(var.get_name()),
-                BasicValueEnum::IntValue(i) => i.set_name(var.get_name()),
-                _ => {return Err("Invalid parameter type!");}
-            };
-            let alloca = self.register_variable(var.clone(), Some(&entry));
-            self.builder.build_store(alloca, param);
-        }
+        // Register it
+        self.functions.insert(ByAddress(func), fn_val);
         Ok(fn_val)
     }
 
+    fn implement_expression(&mut self, expr : &Expression) -> Result<BasicValueEnum, &'static str> {
+        match expr {
+            Expression::Constant(c) => {
+                let typ = self.get_llvm_type(c.get_type()).unwrap();
+                Ok(match c {
+                    Constant::Integer(i) => {
+                        typ.as_int_type().const_int(*i as u64, true)
+                    },
+                    Constant::Boolean(b) => {
+                        typ.as_int_type().const_int(*b as u64, false)
+                    }
+                }.into())
+            },
+            Expression::Negation(n) => {
+                Err("Negation not yet implemented")
+            },
+            Expression::Arithmetic(a) => {
+                Err("Arithmetic operations not yet implemented")
+            },
+            Expression::Not(n) => {
+                Err("Logical negation not yet implemented")
+            },
+            Expression::Logical(l) => {
+                Err("Logical operations not yet implemented")
+            },
+            Expression::Comparison(c) => {
+                Err("Comparisons not yet implemented")
+            },
+            Expression::Variable(v) => {
+                Err("Variables not yet implemented")
+            },
+            Expression::ArrayIndex(a) => {
+                Err("Array indices not yet implemented")
+            },
+            Expression::FunctionCall(f) => {
+                Err("Function calls not yet implemented")
+            }
+        }
+    }
+
     fn implement_statement(&mut self, statement : &Statement) -> Result<(), &'static str> {
-        Err("Statements not yet implemented")
+        match statement {
+            Statement::Assignment(a) => {
+                let expr = self.implement_expression(&a.value);
+                Err("Assignments are not yet implemented")
+            },
+            Statement::Conditional(c) => {
+                Err("Conditionals not yet implemented")
+            },
+            Statement::While(w) => {
+                Err("While loops not yet implemented")
+            },
+            Statement::Repeat(r) => {
+                Err("Repeat loops not yet implemented")
+            },
+            Statement::Break(b) => {
+                Err("Break statements not yet implemented")
+            },
+            Statement::Return(r) => {
+                Err("Return statements not yet implemented")
+            },
+            Statement::Print(p) => {
+                Err("Print statements not yet implemented")
+            },
+            Statement::Input(i) => {
+                Err("Input statements not yet implemented")
+            },
+            Statement::ProcedureCall(p) => {
+                Err("Procedure calls not yet implemented")
+            },
+            Statement::Scope(s) => {
+                Err("Scope not yet implemented")
+            }
+        }
     }
 
     fn implement_scope(&mut self, scope : &Scope, func : FunctionValue)
@@ -179,10 +236,36 @@ impl Compiler {
         Ok(func)
     }
 
-    pub fn compile_fn<T: Callable>(&mut self, func : Rc<T>) -> Result<FunctionValue, &'static str>
+    pub fn get_function(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str> {
+        let byaddress = ByAddress(func);
+        match self.functions.get(&byaddress) {
+            Some(f) => Ok(*f),
+            None => self.register_function(byaddress.0)
+        }
+    }
+
+    pub fn compile_fn(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str>
     {
-        // Compile the prototype
-        let proto = self.compile_prototype(func.clone())?;
+        // Search for the prototype, or compile a new one
+        let proto = self.get_function(func.clone()).unwrap();
+
+        // Prepare compiler
+        // Set it as the current function
+        self.curr_fn = Some(proto);
+        // Create an entry block and point the builder to it's end
+        let entry = self.context.append_basic_block(&proto, "entry");
+        self.builder.position_at_end(&entry);
+        // Register argument variables and name associated arguments, then store to variables
+        for (var, param) in func.get_params().iter().zip(proto.get_param_iter()) {
+            match param {
+                BasicValueEnum::FloatValue(f) => f.set_name(var.get_name()),
+                BasicValueEnum::IntValue(i) => i.set_name(var.get_name()),
+                _ => {return Err("Invalid parameter type!");}
+            };
+            let alloca = self.register_variable(var.clone(), Some(&entry));
+            self.builder.build_store(alloca, param);
+        }
+
         // Compile the body
         let scope = match func.get_scope() {
             Some(scope) => Ok(scope),

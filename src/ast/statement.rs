@@ -1,4 +1,4 @@
-use super::table::{Procedure, Function, Variable, Scoped, Symbol, SymbolTable, Callable};
+use super::table::{Function, Variable, Scoped, Symbol, SymbolTable, Callable};
 use super::expression::{Expression, ArrayIndex, parse_arguments};
 use super::declaration::Declaration;
 use super::parse_bare_scope;
@@ -56,12 +56,12 @@ pub struct Repeat {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProcedureCall {
-    procedure : Rc<Procedure>,
+    procedure : Rc<Function>,
     arguments : Vec<Expression>
 }
 
 impl ProcedureCall {
-    pub fn new(procedure : Rc<Procedure>, arguments : Vec<Expression>) -> SPResult {
+    pub fn new(procedure : Rc<Function>, arguments : Vec<Expression>) -> SPResult {
         if procedure.get_arity() == arguments.len() {
             for (arg, typ) in arguments.iter()
                 .zip(procedure.get_params().iter().map(|p| p.get_type())) {
@@ -77,7 +77,7 @@ impl ProcedureCall {
 pub struct Scope {
     variables : Vec<Rc<Variable>>,
     functions : Vec<Rc<Function>>,
-    procedures : Vec<Rc<Procedure>>,
+    procedures : Vec<Rc<Function>>,
     statements : Vec<Statement>
 }
 
@@ -129,7 +129,7 @@ impl Scope {
 
     pub fn get_variables(&self) -> &Vec<Rc<Variable>> {&self.variables}
     pub fn get_functions(&self) -> &Vec<Rc<Function>> {&self.functions}
-    pub fn get_procedures(&self) -> &Vec<Rc<Procedure>> {&self.procedures}
+    pub fn get_procedures(&self) -> &Vec<Rc<Function>> {&self.procedures}
     pub fn get_statements(&self) -> &Vec<Statement> {&self.statements}
 }
 
