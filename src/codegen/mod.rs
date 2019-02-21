@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 use crate::ast::table::{Variable, Function, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
-use crate::ast::statement::{Scope};
+use crate::ast::statement::*;
 use by_address::ByAddress;
 
 use inkwell::{
@@ -192,11 +192,28 @@ impl Compiler {
         }
     }
 
+    fn get_variable(&mut self, variable : Rc<Variable>) -> PointerValue {
+        let byaddress = ByAddress(variable);
+        match self.variables.get(&byaddress) {
+            Some(p) => *p,
+            None => self.register_variable(byaddress.0, None)
+        }
+    }
+
+    fn get_destination(&mut self, destination : &AssignmentDestination) -> Result<PointerValue, &'static str> {
+        match destination {
+            AssignmentDestination::Variable(v) => Ok(self.get_variable(v.clone())),
+            AssignmentDestination::ArrayIndex(_) => Err("Array indices not yet implemented!")
+        }
+    }
+
     fn implement_statement(&mut self, statement : &Statement) -> Result<(), &'static str> {
         match statement {
             Statement::Assignment(a) => {
-                let expr = self.implement_expression(&a.value);
-                Err("Assignments are not yet implemented")
+                let value = self.implement_expression(&a.value)?;
+                let destination = self.get_destination(&a.destination)?;
+                self.builder.build_store(destination, value);
+                Ok(())
             },
             Statement::Conditional(c) => {
                 Err("Conditionals not yet implemented")
