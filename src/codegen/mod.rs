@@ -4,6 +4,7 @@
 
 use crate::ast::expression::{Constant, Expression, UnaryExpression};
 use crate::ast::statement::Statement;
+use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
 use inkwell::AddressSpace;
 use std::rc::Rc;
@@ -198,8 +199,21 @@ impl Compiler {
             Expression::Arithmetic(_a) => {
                 Err("Arithmetic operations not yet implemented")
             },
-            Expression::Not(_n) => {
-                Err("Logical negation not yet implemented")
+            Expression::Not(n) => {
+                println!("HERE");
+                match n.get_type() {
+                    Type::ScalarType(ScalarType::Boolean) => {
+                        let arg_expr = self.implement_expression(n.get())?;
+                        let int_expr = arg_expr.into_int_value();
+                        Ok(self.builder.build_int_compare(
+                            IntPredicate::EQ,
+                            int_expr,
+                            self.context.bool_type().const_int(0, false),
+                            "nottmp"
+                        ).into())
+                    },
+                    _ => Err("Logical not is not defined for non-boolean types")
+                }
             },
             Expression::Logical(_l) => {
                 Err("Logical operations not yet implemented")

@@ -82,7 +82,7 @@ primary_expression = {
 }
 ternary_expression = {expression ~ kw_if ~ expression ~ kw_else ~ expression}
 function_call = {identifier ~ "(" ~ arguments? ~ ")"}
-negation_expression = {op_minus ~ expression}
+negation_expression = {op_minus ~ binary_expression}
 
 op_plus = {"+"}
 op_minus = {"-"}

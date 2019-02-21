@@ -30,10 +30,14 @@ impl UnaryExpression for Negation {
     fn new(expr : Expression) -> EPResult {
         match expr {
             Expression::Constant(c) => Ok(Expression::Constant(Self::fold(c)?)),
+            Expression::Negation(n) => Ok(*n.arg),
             e => match e.get_type() {
                 Type::ScalarType(s) => match s {
                     ScalarType::Integer => Ok(Expression::Negation(Negation{arg : Box::new(e)})),
-                    _ => Err("Cannot negate non-numeric types")
+                    _ => {
+                        println!("Failed to negate {:#?}", e);
+                        Err("Cannot negate non-numeric types")
+                    }
                 },
                 _ => Err("Cannot negate non-scalar types")
             }
@@ -445,6 +449,7 @@ impl Expression {
                     Symbol::Procedure(_) => Err("Expected variable, got procedure")
                 },
                 _ => {
+                    println!("Failed to dereference variable \"{}\"!", pair.as_str());
                     Err("Could not dereference variable")
                 }
             },
@@ -452,7 +457,7 @@ impl Expression {
                 let mut arg_pairs = pair.into_inner();
                 arg_pairs.next();
                 let arg_pair = arg_pairs.next().unwrap();
-                let arg = Expression::from_pair(arg_pair, sym)?;
+                let arg = Expression::parse_binary(arg_pair, sym)?;
                 Negation::new(arg)
             },
             _ => panic!("{:?} is not a valid primary expression!", pair)
@@ -498,7 +503,12 @@ impl Expression {
                 Comparison::new(lhs, rhs, op)
             },
             Rule::binary_expression => Self::parse_binary(pair, sym),
-            Rule::not_expression => Not::new(Self::parse_logical_primary(pair, sym)?),
+            Rule::not_expression => {
+                let mut arg_pairs = pair.into_inner();
+                let arg_pair = arg_pairs.next().unwrap();
+                let arg = Expression::parse_logical_primary(arg_pair, sym)?;
+                Not::new(arg)
+            },
             _ => panic!("{:?} is not a valid logical primary!", pair)
         }
     }
@@ -620,5 +630,71 @@ mod test {
             ).unwrap()
         );
         assert_eq!(result.get_type(), Type::integer());
+    }
+
+    #[test]
+    fn negation_expressions_parse_correctly() {
+        let mut sym = SymbolTable::new();
+        let x = Rc::new(Variable::integer("x".to_string()));
+        sym.define(Symbol::Variable(x.clone()));
+        let result = Expression::from_pair(
+            CSC488Parser::parse(Rule::expression, "-x").unwrap().next().unwrap(),
+            &mut sym
+        ).unwrap();
+        assert_eq!(
+            result,
+            Negation::new(Expression::Variable(x)).unwrap()
+        );
+        assert_eq!(result.get_type(), Type::integer());
+    }
+
+    #[test]
+    fn double_negations_are_folded_correctly() {
+        //TODO: fix bug with notflag
+        let mut sym = SymbolTable::new();
+        let x = Rc::new(Variable::integer("x".to_string()));
+        sym.define(Symbol::Variable(x.clone()));
+        let result = Expression::from_pair(
+            CSC488Parser::parse(Rule::expression, "--x").unwrap().next().unwrap(),
+            &mut sym
+        ).unwrap();
+        assert_eq!(
+            result,
+            Expression::Variable(x)
+        );
+        assert_eq!(result.get_type(), Type::integer());
+    }
+
+    #[test]
+    fn logical_negation_expressions_parse_correctly() {
+        let mut sym = SymbolTable::new();
+        let x = Rc::new(Variable::boolean("flag".to_string()));
+        sym.define(Symbol::Variable(x.clone()));
+        let result = Expression::from_pair(
+            CSC488Parser::parse(Rule::expression, "not flag").unwrap().next().unwrap(),
+            &mut sym
+        ).unwrap();
+        assert_eq!(
+            result,
+            Not::new(Expression::Variable(x)).unwrap()
+        );
+        assert_eq!(result.get_type(), Type::boolean());
+    }
+
+    #[test]
+    fn double_logical_negations_are_folded_correctly() {
+        //TODO: fix bug with notflag
+        let mut sym = SymbolTable::new();
+        let x = Rc::new(Variable::boolean("nflag".to_string()));
+        sym.define(Symbol::Variable(x.clone()));
+        let result = Expression::from_pair(
+            CSC488Parser::parse(Rule::expression, "not not nflag").unwrap().next().unwrap(),
+            &mut sym
+        ).unwrap();
+        assert_eq!(
+            result,
+            Expression::Variable(x)
+        );
+        assert_eq!(result.get_type(), Type::boolean());
     }
 }
