@@ -119,7 +119,7 @@ impl ProcedureCall {
 impl DependencyVisitor for ProcedureCall {
     fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
         for arg in &self.arguments {visitor = arg.visit_dependencies(visitor)}
-        visitor
+        self.procedure.visit_dependencies(visitor)
     }
 }
 

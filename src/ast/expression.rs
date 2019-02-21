@@ -282,7 +282,7 @@ impl Typed for FunctionCall {
 impl DependencyVisitor for FunctionCall {
     fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
         for arg in &self.arguments {visitor = arg.visit_dependencies(visitor)}
-        visitor
+        self.function.visit_dependencies(visitor)
     }
 }
 

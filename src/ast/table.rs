@@ -98,6 +98,15 @@ impl Function {
     }
 }
 
+impl DependencyVisitor for Function {
+    fn visit_dependencies<T: FnMut(Rc<Variable>)>(&self, mut visitor : T) -> T {
+        if let Some(args) = &self.implicit_args {
+            for arg in args {visitor = arg.visit_dependencies(visitor)}
+        }
+        visitor
+    }
+}
+
 impl Callable for Function {
     fn get_arity(&self) -> usize {self.args.len()}
     fn get_params(&self) -> &Vec<Rc<Variable>> {&self.args}
