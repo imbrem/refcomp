@@ -18,6 +18,8 @@ use pest::Parser;
 
 use self::codegen::*;
 use inkwell::context::Context;
+use inkwell::passes::PassManager;
+use inkwell::targets::{Target, InitializationConfig};
 
 use self::ast::parse_bare_scope;
 use self::ast::table::SymbolTable;
@@ -153,5 +155,70 @@ fn main() -> io::Result<()> {
         println!("Compiled {} functions!\n", cnt);
     }
 
+    println!("Generating main function...");
+
+    let m = std::rc::Rc::new(scope.into_main("main".to_string()));
+
+    let fm = match compiler.compile_fn(m) {
+        Ok(f) => {
+            println!("Generated main function! IR\n----------\n");
+            f.print_to_stderr();
+            println!("\n----------\n");
+            f
+        },
+        Err(e) => {
+            println!("Error generating main function: {}\n", e);
+            return Ok(());
+        }
+    };
+
+    // Verifying the module
+    println!("Verifying module...");
+    match compiler.module.verify() {
+        Err(e) => {
+            println!("Module error: {}", e);
+            return Ok(())
+        },
+        _ => {
+            println!("Module verified!");
+        }
+    }
+
+    println!("Initializing target...");
+    match Target::initialize_native(&InitializationConfig::default()) {
+        Ok(_) => println!("Target initialized!"),
+        Err(s) => {
+            println!("Error initializing target: {}", s);
+            return Ok(());
+        }
+    }
+
+    println!("Creating FPM...");
+    let fpm = PassManager::create_for_function(&compiler.module);
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
+    fpm.add_gvn_pass();
+    fpm.add_cfg_simplification_pass();
+    fpm.add_basic_alias_analysis_pass();
+    fpm.add_promote_memory_to_register_pass();
+    fpm.add_instruction_combining_pass();
+    fpm.add_reassociate_pass();
+
+    fpm.initialize();
+    println!("Running FPM on module...");
+    fpm.run_on_module(&compiler.module);
+
+    println!("Initializing execution engine...");
+    let ee = compiler.module
+        .create_jit_execution_engine(inkwell::OptimizationLevel::None)
+        .unwrap();
+    println!("Execution engine initialized!");
+    println!("Running main function....\n----------\n");
+
+    unsafe {
+        ee.run_function(&fm, &[]);
+    }
+
+    println!("\n----------\n");
     Ok(())
 }

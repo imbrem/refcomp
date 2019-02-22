@@ -21,7 +21,8 @@ use inkwell::{
     context::Context,
     builder::Builder,
     module::Module,
-    basic_block::BasicBlock};
+    basic_block::BasicBlock
+};
 use inkwell::values::{
     PointerValue,
     FunctionValue,
@@ -466,11 +467,20 @@ impl Compiler {
         }
 
         // Compile the body
-        self.implement_scope(scope)?;
-
+        // If the return type is void, tack on an implicit return at the end
+        if func.get_return() == Type::Void {
+            self.builder.build_return(None);
+        } else {
+            self.implement_scope(scope)?;
+        }
         // Clean up by de-registering all variables
         self.clear_variables();
 
-        Ok(proto)
+        // Verify the function
+        if !proto.verify(false) {
+            Err("Error building function: generated invalid LLVM. Check for return statements!")
+        } else {
+            Ok(proto)
+        }
     }
 }

@@ -181,6 +181,18 @@ impl Scope {
     pub fn get_functions(&self) -> &Vec<Rc<Function>> {&self.functions}
     pub fn get_procedures(&self) -> &Vec<Rc<Function>> {&self.procedures}
     pub fn get_statements(&self) -> &Vec<Statement> {&self.statements}
+
+    pub fn into_main(mut self, name : String) -> Function {
+        let res = Function::procedure(name, vec![]);
+        // Now, delete all variables from the locals table (they're globals) and delete all
+        // functions (they're already defined!)
+        self.variables.clear(); self.functions.clear(); self.procedures.clear();
+        // Implement, with everything as a global!
+        res.implement(self);
+        // Set level to zero
+        res.update_level(0);
+        res
+    }
 }
 
 impl Scoped for Scope {
