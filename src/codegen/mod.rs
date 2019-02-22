@@ -206,16 +206,16 @@ impl Compiler {
                         let irhs = rhs_expr.into_int_value();
                         Ok(match a.op {
                             ArithmeticOp::Add => {
-                                self.builder.build_int_add(ilhs, irhs, "addtmp")
+                                self.builder.build_int_add(ilhs, irhs, "iaddtmp")
                             },
                             ArithmeticOp::Mul => {
-                                self.builder.build_int_mul(ilhs, irhs, "multmp")
+                                self.builder.build_int_mul(ilhs, irhs, "imultmp")
                             },
                             ArithmeticOp::Sub => {
-                                self.builder.build_int_sub(ilhs, irhs, "subtmp")
+                                self.builder.build_int_sub(ilhs, irhs, "isubtmp")
                             },
                             ArithmeticOp::Div => {
-                                self.builder.build_int_signed_div(ilhs, irhs, "divtmp")
+                                self.builder.build_int_signed_div(ilhs, irhs, "idivtmp")
                             }
                         }.into())
                     },
