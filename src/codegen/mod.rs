@@ -223,7 +223,6 @@ impl Compiler {
                 }
             },
             Expression::Not(n) => {
-                println!("HERE");
                 match n.get_type() {
                     Type::ScalarType(ScalarType::Boolean) => {
                         let arg_expr = self.implement_expression(n.get())?;
