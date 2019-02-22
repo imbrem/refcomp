@@ -2,7 +2,7 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
-use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp};
+use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp, ComparisonOp};
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
@@ -240,8 +240,81 @@ impl Compiler {
             Expression::Logical(_l) => {
                 Err("Logical operations not yet implemented")
             },
-            Expression::Comparison(_c) => {
-                Err("Comparisons not yet implemented")
+            Expression::Comparison(c) => {
+                let lt = c.lhs.get_type();
+                let rt = c.rhs.get_type();
+                let le = self.implement_expression(&c.lhs)?;
+                let re = self.implement_expression(&c.rhs)?;
+                match (lt, rt) {
+                    (Type::ScalarType(ScalarType::Boolean), Type::ScalarType(ScalarType::Boolean))
+                    => {
+                        match c.op {
+                            ComparisonOp::EQ => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::EQ, le.into_int_value(), re.into_int_value(),
+                                    "bcmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::NE => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::NE, le.into_int_value(), re.into_int_value(),
+                                    "bcmptmp"
+                                ).into())
+                            },
+                            _ => {
+                                Err("Invalid comparison operation between booleans!")
+                            }
+                        }
+                    },
+                    (Type::ScalarType(ScalarType::Integer), Type::ScalarType(ScalarType::Integer))
+                    => {
+                        match c.op {
+                            ComparisonOp::EQ => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::EQ, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::NE => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::NE, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::LT => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::SLT, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::LE => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::SLE, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::GT => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::SGT, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            },
+                            ComparisonOp::GE => {
+                                Ok(self.builder.build_int_compare(
+                                    IntPredicate::SGE, le.into_int_value(), re.into_int_value(),
+                                    "icmptmp"
+                                ).into())
+                            }
+                        }
+                    },
+                    (x, y) => {
+                        if x == y {
+                            Err("Cannot compare incomparable types!")
+                        } else {
+                            Err("Cannot compare unequal types!")
+                        }
+                    }
+                }
             },
             Expression::Variable(v) => {
                 let ptr = self.get_variable(v.clone());

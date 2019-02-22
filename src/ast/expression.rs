@@ -204,9 +204,9 @@ impl DependencyVisitor for Logical {
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Comparison {
-    lhs : Box<Expression>,
-    rhs : Box<Expression>,
-    op : ComparisonOp
+    pub lhs : Box<Expression>,
+    pub rhs : Box<Expression>,
+    pub op : ComparisonOp
 }
 
 impl Comparison {
