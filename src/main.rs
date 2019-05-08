@@ -18,7 +18,7 @@ use pest::Parser;
 
 use self::codegen::*;
 use inkwell::context::Context;
-use inkwell::passes::PassManager;
+//use inkwell::passes::PassManager;
 use inkwell::targets::{Target, InitializationConfig};
 
 use self::ast::parse_bare_scope;
@@ -193,6 +193,7 @@ fn main() -> io::Result<()> {
         }
     }
 
+    /*
     println!("Creating FPM...");
     let fpm = PassManager::create_for_function(&compiler.module);
     fpm.add_instruction_combining_pass();
@@ -207,6 +208,7 @@ fn main() -> io::Result<()> {
     fpm.initialize();
     println!("Running FPM on module...");
     fpm.run_on_module(&compiler.module);
+    */
 
     println!("Initializing execution engine...");
     let ee = compiler.module
