@@ -1,0 +1,1 @@
+This is the beginning of an implementation of a compiler for the [CSC488 Source Language](https://www.cs.toronto.edu/~pdm/csc488/winter2019/assignments/langspec.html) written in Rust with LLVM as a backend. It is nowhere near complete or bug-free, so use with caution!
