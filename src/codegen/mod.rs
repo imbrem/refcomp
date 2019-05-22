@@ -6,6 +6,7 @@ use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
+use inkwell::passes::PassManager;
 use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
@@ -33,6 +34,7 @@ use inkwell::values::{
 pub struct Compiler {
     pub context : Context,
     pub module : Module,
+    fpm : PassManager,
     builder : Builder,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
     functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
@@ -66,15 +68,20 @@ impl Compiler {
         }
     }
 
-    pub fn new(
+    pub fn new<F : FnOnce(&mut PassManager)>(
         context : Context,
-        module : Module
+        module : Module,
+        passes : F
     ) -> Compiler {
         let builder = context.create_builder();
+        let mut fpm = inkwell::passes::PassManager::create_for_function(&module);
+        passes(&mut fpm);
+        fpm.initialize();
         Compiler {
             context : context,
             module : module,
             builder : builder,
+            fpm : fpm,
             variables : HashMap::new(),
             functions : HashMap::new(),
             globals : HashMap::new(),
@@ -467,19 +474,16 @@ impl Compiler {
         }
 
         // Compile the body
-        // If the return type is void, tack on an implicit return at the end
-        if func.get_return() == Type::Void {
-            self.builder.build_return(None);
-        } else {
-            self.implement_scope(scope)?;
-        }
+        self.implement_scope(scope)?;
         // Clean up by de-registering all variables
         self.clear_variables();
 
         // Verify the function
         if !proto.verify(false) {
+            proto.print_to_stderr();
             Err("Error building function: generated invalid LLVM. Check for return statements!")
         } else {
+            self.fpm.run_on_function(&proto);
             Ok(proto)
         }
     }

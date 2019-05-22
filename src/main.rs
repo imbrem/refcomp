@@ -65,10 +65,29 @@ fn main() -> io::Result<()> {
 
     let context = Context::create();
     let module = context.create_module("repl");
+    let passes = |fpm : &mut inkwell::passes::PassManager| {
+        fpm.add_instruction_combining_pass();
+        fpm.add_reassociate_pass();
+        fpm.add_gvn_pass();
+        fpm.add_cfg_simplification_pass();
+        fpm.add_basic_alias_analysis_pass();
+        fpm.add_promote_memory_to_register_pass();
+        fpm.add_instruction_combining_pass();
+        fpm.add_reassociate_pass();
+    };
 
-    let mut compiler = Compiler::new(context, module);
+    let mut compiler = Compiler::new(context, module, passes);
 
-    println!("Compiler initialized!\n\n");
+    println!("Compiler initialized!");
+
+    println!("Initializing target...");
+    match Target::initialize_native(&InitializationConfig::default()) {
+        Ok(()) => println!("Target initialized!"),
+        Err(s) => {
+            println!("Error initializing target: {}", s);
+            return Ok(());
+        }
+    }
 
     println!("Registering globals...");
 
@@ -183,32 +202,6 @@ fn main() -> io::Result<()> {
             println!("Module verified!");
         }
     }
-
-    println!("Initializing target...");
-    match Target::initialize_native(&InitializationConfig::default()) {
-        Ok(_) => println!("Target initialized!"),
-        Err(s) => {
-            println!("Error initializing target: {}", s);
-            return Ok(());
-        }
-    }
-
-    /*
-    println!("Creating FPM...");
-    let fpm = PassManager::create_for_function(&compiler.module);
-    fpm.add_instruction_combining_pass();
-    fpm.add_reassociate_pass();
-    fpm.add_gvn_pass();
-    fpm.add_cfg_simplification_pass();
-    fpm.add_basic_alias_analysis_pass();
-    fpm.add_promote_memory_to_register_pass();
-    fpm.add_instruction_combining_pass();
-    fpm.add_reassociate_pass();
-
-    fpm.initialize();
-    println!("Running FPM on module...");
-    fpm.run_on_module(&compiler.module);
-    */
 
     println!("Initializing execution engine...");
     let ee = compiler.module
