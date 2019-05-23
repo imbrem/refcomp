@@ -147,7 +147,7 @@ arguments = {
     expression ~ ("," ~ expression)*
 }
 single_output = {
-    expression | text | "newline"
+    "newline" | expression | text
 }
 output = {
     single_output ~ ("," ~ single_output)*

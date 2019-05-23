@@ -187,6 +187,8 @@ fn main() -> io::Result<()> {
         },
         Err(e) => {
             println!("Error generating main function: {}\n", e);
+            println!("Module IR dump:\n");
+            compiler.module.print_to_stderr();
             return Ok(());
         }
     };
@@ -214,7 +216,5 @@ fn main() -> io::Result<()> {
     unsafe {
         ee.run_function(&fm, &[]);
     }
-
-    println!("\n----------\n");
     Ok(())
 }
