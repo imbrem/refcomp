@@ -187,10 +187,10 @@ impl Scope {
         // Now, delete all variables from the locals table (they're globals) and delete all
         // functions (they're already defined!)
         self.variables.clear(); self.functions.clear(); self.procedures.clear();
-        // Implement, with everything as a global!
-        res.implement(self);
         // Set level to zero
         res.update_level(0);
+        // Implement, with everything as a global!
+        res.implement(self);
         res
     }
 }
