@@ -11,6 +11,7 @@ use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
 
+
 use crate::ast::table::{Variable, Function, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
 use crate::ast::statement::*;
@@ -28,6 +29,7 @@ use inkwell::values::{
     PointerValue,
     FunctionValue,
     GlobalValue,
+    IntValue,
     BasicValueEnum
 };
 
@@ -39,7 +41,9 @@ pub struct Compiler {
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
     functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
     globals : HashMap<ByAddress<Rc<Variable>>, GlobalValue>,
-    curr_fn : Option<FunctionValue>
+    curr_fn : Option<FunctionValue>,
+    printf_val : Option<FunctionValue>,
+    strings : u64
 }
 
 impl Compiler {
@@ -85,8 +89,23 @@ impl Compiler {
             variables : HashMap::new(),
             functions : HashMap::new(),
             globals : HashMap::new(),
-            curr_fn : None
+            curr_fn : None,
+            printf_val : None,
+            strings : 0
         }
+    }
+
+    fn get_printf(&mut self) -> FunctionValue {
+        if self.printf_val.is_none() {
+            let printf_ty = self.context.i32_type().fn_type(
+                &[self.context.i8_type().ptr_type(AddressSpace::Generic).into()],
+                true
+            );
+            self.printf_val = Some(
+                self.module.add_function("printf", printf_ty, None)
+            );
+        }
+        self.printf_val.unwrap()
     }
 
     // Code mostly taken from:
@@ -370,6 +389,28 @@ impl Compiler {
         }
     }
 
+    fn global_string(&mut self, string : Vec<u8>) -> GlobalValue {
+        let ct = self.context.i8_type();
+        let chars : Vec<IntValue> =
+            string.into_iter().map(|char| {ct.const_int(char.into(), false)}).collect();
+        let string = ct.const_array(&chars);
+        let mut name = "$string_".to_owned();
+        name.push_str(&self.strings.to_string());
+        self.strings += 1;
+        let global = self.module.add_global(string.get_type(), None, &name);
+        global.set_initializer(&string);
+        global.set_constant(true);
+        global.set_visibility(inkwell::GlobalVisibility::Hidden);
+        global
+    }
+
+    fn gep_first(&mut self, ptr : PointerValue) -> PointerValue {
+        let sz = self.context.i64_type();
+        unsafe {
+            self.builder.build_in_bounds_gep(ptr, &[sz.const_zero(), sz.const_zero()], "gep_first")
+        }
+    }
+
     fn implement_statement(&mut self, statement : &Statement) -> Result<(), &'static str> {
         match statement {
             Statement::Assignment(a) => {
@@ -399,8 +440,33 @@ impl Compiler {
                     None => self.builder.build_return(None)
                 }; Ok(())
             },
-            Statement::Print(_p) => {
-                Err("Print statements not yet implemented")
+            Statement::Print(p) => {
+                let mut fmt = Vec::new();
+                for output in p {
+                    match output {
+                        //TODO: generalize
+                        OutputElement::Expression(_) => fmt.extend_from_slice("%d".as_bytes()),
+                        OutputElement::Text(t) =>  fmt.extend_from_slice(t.as_bytes()),
+                        OutputElement::Newline => fmt.extend_from_slice("\n".as_bytes())
+                    }
+                }
+                fmt.push(0); // Null terminator
+                let global_str = self.global_string(fmt);
+                let global_ptr = self.gep_first(global_str.as_pointer_value());
+                let mut args = vec![global_ptr.into()];
+                for output in p {
+                    match output {
+                        OutputElement::Expression(e) => args.push(self.implement_expression(e)?),
+                        OutputElement::Text(_) | OutputElement::Newline => {}
+                    }
+                }
+                let printf = self.get_printf();
+                self.builder.build_call(
+                    printf,
+                    &args,
+                    "print_statement"
+                );
+                Ok(())
             },
             Statement::Input(_i) => {
                 Err("Input statements not yet implemented")
@@ -498,7 +564,6 @@ impl Compiler {
 
         // Verify the function
         if !proto.verify(false) {
-            proto.print_to_stderr();
             Err("Error building function: generated invalid LLVM. Check for return statements!")
         } else {
             self.fpm.run_on_function(&proto);
