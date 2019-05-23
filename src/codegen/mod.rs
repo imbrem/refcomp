@@ -135,10 +135,18 @@ impl Compiler {
         pointer_val
     }
 
+    fn zero_initializer(ty : BasicTypeEnum) -> BasicValueEnum {
+        match ty {
+            BasicTypeEnum::FloatType(f) => f.const_zero().into(),
+            BasicTypeEnum::IntType(i) => i.const_zero().into(),
+            t => panic!("Type {:?} not supported!", t)
+        }
+    }
+
     pub fn register_global(&mut self, var : Rc<Variable>) {
-        let new_global = self.module.add_global(
-            self.get_llvm_type(var.get_type()).unwrap(),
-            Some(AddressSpace::Generic), var.get_name());
+        let ty = self.get_llvm_type(var.get_type()).unwrap();
+        let new_global = self.module.add_global(ty, None, var.get_name());
+        new_global.set_initializer(&Self::zero_initializer(ty));
         let apv = new_global.as_pointer_value();
         self.globals.insert(ByAddress(var.clone()), new_global);
         self.variables.insert(ByAddress(var.clone()), apv);

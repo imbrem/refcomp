@@ -31,7 +31,7 @@ fn main() -> io::Result<()> {
     let scope = match parser::CSC488Parser::parse(parser::Rule::bare_scope, &buffer) {
         Ok(mut scope) => match scope.next( ){
             Some(scope) => {
-                println!("Parsing result:\n{:#?}\n\n\n", scope);
+                println!("Parsing result:\n{:#}\n\n\n", scope);
                 scope
             },
             None => {
@@ -199,7 +199,8 @@ fn main() -> io::Result<()> {
             return Ok(())
         },
         _ => {
-            println!("Module verified!");
+            println!("Module verified! Generated LLVM:\n");
+            compiler.module.print_to_stderr();
         }
     }
 
