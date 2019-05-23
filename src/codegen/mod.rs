@@ -123,8 +123,15 @@ impl Compiler {
 
     fn register_variable(&mut self, var : Rc<Variable>, entry : Option<&BasicBlock>)
     -> PointerValue {
-        let pointer_val = self.create_entry_block_alloca(var.as_ref(), entry);
-        self.variables.insert(ByAddress(var), pointer_val);
+        let byaddress = ByAddress(var);
+        match self.globals.get(&byaddress) {
+            Some(g) => {
+                return g.as_pointer_value();
+            }
+            None => {}
+        }
+        let pointer_val = self.create_entry_block_alloca(byaddress.as_ref(), entry);
+        self.variables.insert(byaddress, pointer_val);
         pointer_val
     }
 
@@ -132,7 +139,9 @@ impl Compiler {
         let new_global = self.module.add_global(
             self.get_llvm_type(var.get_type()).unwrap(),
             Some(AddressSpace::Generic), var.get_name());
+        let apv = new_global.as_pointer_value();
         self.globals.insert(ByAddress(var.clone()), new_global);
+        self.variables.insert(ByAddress(var.clone()), apv);
     }
 
     fn get_implicit_arg_type(&self, typ : Type) -> Result<BasicTypeEnum, &'static str> {
@@ -339,6 +348,7 @@ impl Compiler {
 
     fn get_variable(&mut self, variable : Rc<Variable>) -> PointerValue {
         let byaddress = ByAddress(variable);
+
         match self.variables.get(&byaddress) {
             Some(p) => *p,
             None => self.register_variable(byaddress.0, None)
