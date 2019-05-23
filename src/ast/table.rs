@@ -1,4 +1,3 @@
-use by_address::ByAddress;
 use std::rc::Rc;
 use super::types::{Type, Typed};
 use super::statement::Scope;
@@ -99,13 +98,18 @@ impl Function {
     pub fn implement(&self, scope : Scope) {
         let mut iargs = vec![];
         scope.visit_dependencies(|v : Rc<Variable>| {
-            let b = ByAddress(v);
-            if b.get_level().unwrap() < self.get_level().unwrap() {
-                iargs.push(b.0)
-            } else if b.get_level().unwrap() > self.get_level().unwrap() + 1 {
+            if v.get_level().unwrap_or_else(|| {
+                panic!("Variable \"{}\" has no level.\nVariable dump:\n{:?}", v.get_name(), v)
+            }) < self.get_level().unwrap_or_else(|| {
+                panic!("Cannot implement function \"{}\" with no scope.\nFunction dump:\n{:#?}",
+                    self.get_name(), self
+                )
+            }) {
+                iargs.push(v)
+            } else if v.get_level().unwrap() > self.get_level().unwrap() + 1 {
                 panic!(
                     "Level of variable {:#?} too high to dereference from this scope ({:#?})!",
-                    b, self
+                    v, self
                 );
             }
         });

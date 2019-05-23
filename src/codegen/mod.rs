@@ -6,6 +6,7 @@ use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
+use inkwell::passes::PassManager;
 use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
@@ -33,6 +34,7 @@ use inkwell::values::{
 pub struct Compiler {
     pub context : Context,
     pub module : Module,
+    fpm : PassManager,
     builder : Builder,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
     functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
@@ -66,15 +68,20 @@ impl Compiler {
         }
     }
 
-    pub fn new(
+    pub fn new<F : FnOnce(&mut PassManager)>(
         context : Context,
-        module : Module
+        module : Module,
+        passes : F
     ) -> Compiler {
         let builder = context.create_builder();
+        let mut fpm = inkwell::passes::PassManager::create_for_function(&module);
+        passes(&mut fpm);
+        fpm.initialize();
         Compiler {
             context : context,
             module : module,
             builder : builder,
+            fpm : fpm,
             variables : HashMap::new(),
             functions : HashMap::new(),
             globals : HashMap::new(),
@@ -116,16 +123,33 @@ impl Compiler {
 
     fn register_variable(&mut self, var : Rc<Variable>, entry : Option<&BasicBlock>)
     -> PointerValue {
-        let pointer_val = self.create_entry_block_alloca(var.as_ref(), entry);
-        self.variables.insert(ByAddress(var), pointer_val);
+        let byaddress = ByAddress(var);
+        match self.globals.get(&byaddress) {
+            Some(g) => {
+                return g.as_pointer_value();
+            }
+            None => {}
+        }
+        let pointer_val = self.create_entry_block_alloca(byaddress.as_ref(), entry);
+        self.variables.insert(byaddress, pointer_val);
         pointer_val
     }
 
+    fn zero_initializer(ty : BasicTypeEnum) -> BasicValueEnum {
+        match ty {
+            BasicTypeEnum::FloatType(f) => f.const_zero().into(),
+            BasicTypeEnum::IntType(i) => i.const_zero().into(),
+            t => panic!("Type {:?} not supported!", t)
+        }
+    }
+
     pub fn register_global(&mut self, var : Rc<Variable>) {
-        let new_global = self.module.add_global(
-            self.get_llvm_type(var.get_type()).unwrap(),
-            Some(AddressSpace::Generic), var.get_name());
+        let ty = self.get_llvm_type(var.get_type()).unwrap();
+        let new_global = self.module.add_global(ty, None, var.get_name());
+        new_global.set_initializer(&Self::zero_initializer(ty));
+        let apv = new_global.as_pointer_value();
         self.globals.insert(ByAddress(var.clone()), new_global);
+        self.variables.insert(ByAddress(var.clone()), apv);
     }
 
     fn get_implicit_arg_type(&self, typ : Type) -> Result<BasicTypeEnum, &'static str> {
@@ -332,6 +356,7 @@ impl Compiler {
 
     fn get_variable(&mut self, variable : Rc<Variable>) -> PointerValue {
         let byaddress = ByAddress(variable);
+
         match self.variables.get(&byaddress) {
             Some(p) => *p,
             None => self.register_variable(byaddress.0, None)
@@ -467,19 +492,16 @@ impl Compiler {
         }
 
         // Compile the body
-        // If the return type is void, tack on an implicit return at the end
-        if func.get_return() == Type::Void {
-            self.builder.build_return(None);
-        } else {
-            self.implement_scope(scope)?;
-        }
+        self.implement_scope(scope)?;
         // Clean up by de-registering all variables
         self.clear_variables();
 
         // Verify the function
         if !proto.verify(false) {
+            proto.print_to_stderr();
             Err("Error building function: generated invalid LLVM. Check for return statements!")
         } else {
+            self.fpm.run_on_function(&proto);
             Ok(proto)
         }
     }
