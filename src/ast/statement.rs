@@ -242,7 +242,7 @@ pub enum Statement {
     Break(u32),
     Return(Option<Expression>),
     Print(Vec<OutputElement>),
-    Input(Vec<String>),
+    Input(Vec<Rc<Variable>>),
     ProcedureCall(ProcedureCall),
     Scope(Scope)
 }
@@ -262,7 +262,11 @@ impl DependencyVisitor for Statement {
                 for oe in v {visitor = oe.visit_dependencies(visitor)}
                 visitor
             },
-            Statement::Input(_) => visitor,
+            Statement::Input(i) => {
+                let mut visitor = visitor;
+                for var in i {visitor = var.visit_dependencies(visitor)}
+                visitor
+            },
             Statement::ProcedureCall(p) => p.visit_dependencies(visitor),
             Statement::Scope(s) => s.visit_dependencies(visitor)
         }
@@ -340,26 +344,41 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Stat
             None => Ok(Statement::Return(None))
         },
         Rule::print_statement => {
-            let outputs = pair.into_inner().next().unwrap().into_inner().map(|o| {
+            let outputs = pair.into_inner().next().unwrap().into_inner().map(
+                |o| -> Result<OutputElement, &'static str>{
                     let o = o.into_inner().next();
                     if let Some(o) = o {
                         match o.as_rule() {
                             Rule::expression =>
-                                OutputElement::Expression(Expression::from_pair(o, sym).unwrap()),
+                                Ok(OutputElement::Expression(Expression::from_pair(o, sym)?)),
                             Rule::text =>
-                                OutputElement::Text(
+                                Ok(OutputElement::Text(
                                     o.into_inner().next().unwrap().as_str().to_string()
-                                ),
+                                )),
                             _ => unreachable!()
                         }
                     } else {
-                        OutputElement::Newline
+                        Ok(OutputElement::Newline)
                     }
                 });
-            Ok(Statement::Print(outputs.collect()))
+            let outputs : Result<Vec<OutputElement>, &'static str> = outputs.collect();
+            Ok(Statement::Print(outputs?))
         },
         Rule::input_statement => {
-            panic!("Input is not yet implemented!")
+            let inputs = pair.into_inner().next().unwrap().into_inner().map(|i| {
+                match sym.dereference(i.as_str()) {
+                    Some(sym) => match sym {
+                        Symbol::Variable(v) => Ok(v),
+                        Symbol::Function(_) =>
+                            Err("Expected variable in input statement, got function"),
+                        Symbol::Procedure(_) =>
+                            Err("Expected variable in input statement, got procedure")
+                    },
+                    None => Err("Could not dereference variable in input statement")
+                }
+            });
+            let inputs : Result<Vec<Rc<Variable>>, &'static str> = inputs.collect();
+            Ok(Statement::Input(inputs?))
         },
         Rule::procedure_call => {
             let mut pairs = pair.into_inner();

@@ -490,8 +490,24 @@ impl Compiler {
                 );
                 Ok(false)
             },
-            Statement::Input(_i) => {
-                Err("Input statements not yet implemented")
+            Statement::Input(i) => {
+                // Formatter for inputs
+                let base = " %d".as_bytes();
+                // Format string
+                let mut fmt : Vec<u8> = base.iter().cloned().cycle().take(base.len() * i.len()).collect();
+                fmt.push(0);
+                let global_str = self.global_string(fmt);
+                let global_ptr = self.gep_first(global_str.as_pointer_value());
+                let mut args = vec![global_ptr.into()];
+                for var in i.iter().cloned() {
+                    args.push(self.get_variable(var).into())
+                }
+                self.builder.build_call(
+                    self.scanf_val,
+                    &args,
+                    "input_statement"
+                );
+                Ok(false)
             },
             Statement::ProcedureCall(p) => {
                 self.implement_function_call(p.get_proc(), p.get_args(), "proc_call")?;
