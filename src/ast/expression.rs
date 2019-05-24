@@ -281,6 +281,12 @@ impl FunctionCall {
             Ok(Expression::FunctionCall(FunctionCall{function : function, arguments : arguments})
         )} else {Err("Invalid number of arguments to function call")}
     }
+    pub fn get_function(&self) -> Rc<Function> {
+        self.function.clone()
+    }
+    pub fn get_args(&self) -> &[Expression] {
+        &self.arguments
+    }
 }
 
 impl Typed for FunctionCall {

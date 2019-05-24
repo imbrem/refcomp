@@ -11,7 +11,6 @@ use inkwell::AddressSpace;
 use std::rc::Rc;
 use std::collections::HashMap;
 
-
 use crate::ast::table::{Variable, Function, Callable};
 use crate::ast::types::{Type, ScalarType, Typed};
 use crate::ast::statement::*;
@@ -40,6 +39,7 @@ pub struct Compiler {
     builder : Builder,
     variables : HashMap<ByAddress<Rc<Variable>>, PointerValue>,
     functions : HashMap<ByAddress<Rc<Function>>, FunctionValue>,
+    used : Vec<Rc<Function>>,
     globals : HashMap<ByAddress<Rc<Variable>>, GlobalValue>,
     curr_fn : Option<FunctionValue>,
     printf_val : Option<FunctionValue>,
@@ -88,6 +88,7 @@ impl Compiler {
             fpm : fpm,
             variables : HashMap::new(),
             functions : HashMap::new(),
+            used : Vec::new(),
             globals : HashMap::new(),
             curr_fn : None,
             printf_val : None,
@@ -213,6 +214,7 @@ impl Compiler {
         // Create the function
         let fn_val = self.module.add_function(func.get_name(), function_type, None);
         // Register it
+        self.used.push(func.clone());
         self.functions.insert(ByAddress(func), fn_val);
         Ok(fn_val)
     }
@@ -367,8 +369,15 @@ impl Compiler {
             Expression::ArrayIndex(_a) => {
                 Err("Array indices not yet implemented")
             },
-            Expression::FunctionCall(_f) => {
-                Err("Function calls not yet implemented")
+            Expression::FunctionCall(f) => {
+                let called = self.get_function(f.get_function())?;
+                let args : Result<Vec<BasicValueEnum>, &'static str> = f.get_args().iter()
+                    .map(|arg| self.implement_expression(arg)).collect();
+                Ok(
+                    self.builder.build_call(called, &(args?), "function_call")
+                        .try_as_basic_value()
+                        .left().unwrap()
+                )
             }
         }
     }
@@ -510,16 +519,18 @@ impl Compiler {
             None => Err("Tried to compile function without scope!")
         }?;
 
-        // FIRST: compile all nested functions and procedures
-        for f in scope.get_functions().iter().cloned() {
-            self.compile_fn(f)?;
-        }
-        for p in scope.get_procedures().iter().cloned() {
-            self.compile_fn(p)?;
-        }
-
         // Search for the prototype, or compile a new one
-        let proto = self.get_function(func.clone()).unwrap();
+        let proto = {
+            let byaddress = ByAddress(func.clone());
+            match self.functions.get(&byaddress) {
+                Some(f) => *f,
+                None => {
+                    let res = self.register_function(byaddress.0);
+                    self.used.pop();
+                    res?
+                }
+            }
+        };
 
         // Prepare compiler
         // Set it as the current function
@@ -564,10 +575,17 @@ impl Compiler {
 
         // Verify the function
         if !proto.verify(false) {
-            Err("Error building function: generated invalid LLVM. Check for return statements!")
-        } else {
-            self.fpm.run_on_function(&proto);
-            Ok(proto)
+            return Err("Error building function: generated invalid LLVM. Check for return statements!");
         }
+        // Run the FPM on the function
+        self.fpm.run_on_function(&proto);
+
+        // Now, compile all newly registered functions
+        while !self.used.is_empty() {
+            let func = self.used.pop().unwrap();
+            self.compile_fn(func)?;
+        }
+
+        Ok(proto)
     }
 }
