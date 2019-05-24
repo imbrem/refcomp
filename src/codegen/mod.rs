@@ -490,8 +490,19 @@ impl Compiler {
                 self.builder.position_at_end(&break_bb);
                 Ok(false)
             },
-            Statement::Repeat(_r) => {
-                Err("Repeat loops not yet implemented")
+            Statement::Repeat(r) => {
+                let parent = self.get_curr();
+                let repeat_bb = self.context.append_basic_block(&parent, "repeat");
+                let cont_bb = self.context.append_basic_block(&parent, "cont");
+                self.builder.build_unconditional_branch(&repeat_bb);
+                self.builder.position_at_end(&repeat_bb);
+                self.implement_scope(&r.scope)?;
+                let condition = self.implement_expression(&r.condition)?;
+                self.builder.build_conditional_branch(
+                    *condition.as_int_value(), &cont_bb, &repeat_bb
+                );
+                self.builder.position_at_end(&cont_bb);
+                Ok(false)
             },
             Statement::Break(_b) => {
                 Err("Break statements not yet implemented")
