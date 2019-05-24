@@ -43,7 +43,8 @@ pub struct Compiler {
     used : Vec<Rc<Function>>,
     globals : HashMap<ByAddress<Rc<Variable>>, GlobalValue>,
     curr_fn : Option<FunctionValue>,
-    printf_val : Option<FunctionValue>,
+    printf_val : FunctionValue,
+    scanf_val : FunctionValue,
     strings : u64
 }
 
@@ -79,6 +80,8 @@ impl Compiler {
         passes : F
     ) -> Compiler {
         let builder = context.create_builder();
+        let printf = Self::gen_printf(&context, &module);
+        let scanf = Self::gen_scanf(&context, &module);
         let mut fpm = inkwell::passes::PassManager::create_for_function(&module);
         passes(&mut fpm);
         fpm.initialize();
@@ -92,22 +95,26 @@ impl Compiler {
             used : Vec::new(),
             globals : HashMap::new(),
             curr_fn : None,
-            printf_val : None,
+            printf_val : printf,
+            scanf_val : scanf,
             strings : 0
         }
     }
 
-    fn get_printf(&mut self) -> FunctionValue {
-        if self.printf_val.is_none() {
-            let printf_ty = self.context.i32_type().fn_type(
-                &[self.context.i8_type().ptr_type(AddressSpace::Generic).into()],
-                true
-            );
-            self.printf_val = Some(
-                self.module.add_function("printf", printf_ty, None)
-            );
-        }
-        self.printf_val.unwrap()
+    fn gen_printf(context : &Context, module : &Module) -> FunctionValue {
+        let printf_ty = context.i32_type().fn_type(
+            &[context.i8_type().ptr_type(AddressSpace::Generic).into()],
+            true
+        );
+        module.add_function("printf", printf_ty, None)
+    }
+
+    fn gen_scanf(context : &Context, module : &Module) -> FunctionValue {
+        let scanf_ty = context.i32_type().fn_type(
+            &[context.i8_type().ptr_type(AddressSpace::Generic).into()],
+            true
+        );
+        module.add_function("scanf", scanf_ty, None)
     }
 
     // Code mostly taken from:
@@ -426,13 +433,13 @@ impl Compiler {
         }
     }
 
-    fn implement_statement(&mut self, statement : &Statement) -> Result<(), &'static str> {
+    fn implement_statement(&mut self, statement : &Statement) -> Result<bool, &'static str> {
         match statement {
             Statement::Assignment(a) => {
                 let value = self.implement_expression(&a.value)?;
                 let destination = self.get_destination(&a.destination)?;
                 self.builder.build_store(destination, value);
-                Ok(())
+                Ok(false)
             },
             Statement::Conditional(_c) => {
                 Err("Conditionals not yet implemented")
@@ -453,7 +460,8 @@ impl Compiler {
                         self.builder.build_return(Some(&rexpr))
                     },
                     None => self.builder.build_return(None)
-                }; Ok(())
+                };
+                Ok(true)
             },
             Statement::Print(p) => {
                 let mut fmt = Vec::new();
@@ -475,20 +483,19 @@ impl Compiler {
                         OutputElement::Text(_) | OutputElement::Newline => {}
                     }
                 }
-                let printf = self.get_printf();
                 self.builder.build_call(
-                    printf,
+                    self.printf_val,
                     &args,
                     "print_statement"
                 );
-                Ok(())
+                Ok(false)
             },
             Statement::Input(_i) => {
                 Err("Input statements not yet implemented")
             },
             Statement::ProcedureCall(p) => {
                 self.implement_function_call(p.get_proc(), p.get_args(), "proc_call")?;
-                Ok(())
+                Ok(false)
             },
             Statement::Scope(s) => {
                 self.implement_scope(s)
@@ -497,12 +504,16 @@ impl Compiler {
     }
 
     fn implement_scope(&mut self, scope : &Scope)
-    -> Result<(), &'static str> {
+    -> Result<bool, &'static str> {
         // Register all variables
         for var in scope.get_variables().iter().cloned() {self.register_variable(var, None);}
         // TODO: deal with nested functions and procedures
-        for statement in scope.get_statements() {self.implement_statement(statement)?}
-        Ok(())
+        let mut flow = false;
+        for statement in scope.get_statements() {
+            flow = self.implement_statement(statement)?;
+            if flow {break;}
+        }
+        Ok(flow)
     }
 
     pub fn get_function(&mut self, func : Rc<Function>) -> Result<FunctionValue, &'static str> {
@@ -576,7 +587,17 @@ impl Compiler {
         }
 
         // Compile the body
-        self.implement_scope(scope)?;
+        let flow = self.implement_scope(scope)?;
+        if !flow { // No return statement
+            match func.get_type() {
+                Type::Null | Type::Void => { // Void or unit type, so append one
+                    self.builder.build_return(None);
+                },
+                _ => {
+                    return Err("Error building function: function without return statement");
+                }
+            }
+        }
         // Clean up by de-registering all variables
         self.clear_variables();
 
