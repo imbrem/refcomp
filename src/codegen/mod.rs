@@ -181,6 +181,7 @@ impl Compiler {
         match ty {
             BasicTypeEnum::FloatType(f) => f.const_zero().into(),
             BasicTypeEnum::IntType(i) => i.const_zero().into(),
+            BasicTypeEnum::ArrayType(a) => a.const_zero().into(),
             t => panic!("Type {:?} not supported!", t)
         }
     }
