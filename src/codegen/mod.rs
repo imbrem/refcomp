@@ -29,7 +29,8 @@ use inkwell::values::{
     FunctionValue,
     GlobalValue,
     IntValue,
-    BasicValueEnum
+    BasicValueEnum,
+    CallSiteValue
 };
 
 pub struct Compiler {
@@ -370,16 +371,21 @@ impl Compiler {
                 Err("Array indices not yet implemented")
             },
             Expression::FunctionCall(f) => {
-                let called = self.get_function(f.get_function())?;
-                let args : Result<Vec<BasicValueEnum>, &'static str> = f.get_args().iter()
-                    .map(|arg| self.implement_expression(arg)).collect();
                 Ok(
-                    self.builder.build_call(called, &(args?), "function_call")
-                        .try_as_basic_value()
-                        .left().unwrap()
+                    self.implement_function_call(f.get_function(), f.get_args(), "function_call")?
+                    .try_as_basic_value()
+                    .left().unwrap()
                 )
             }
         }
+    }
+
+    fn implement_function_call(&mut self, func : Rc<Function>, args : &[Expression], name : &str)
+    -> Result<CallSiteValue, &'static str> {
+        let called = self.get_function(func)?;
+        let args : Result<Vec<BasicValueEnum>, &'static str> =  args.iter()
+            .map(|arg| self.implement_expression(arg)).collect();
+        Ok(self.builder.build_call(called, &(args?), name))
     }
 
     fn get_variable(&mut self, variable : Rc<Variable>) -> PointerValue {
@@ -480,8 +486,9 @@ impl Compiler {
             Statement::Input(_i) => {
                 Err("Input statements not yet implemented")
             },
-            Statement::ProcedureCall(_p) => {
-                Err("Procedure calls not yet implemented")
+            Statement::ProcedureCall(p) => {
+                self.implement_function_call(p.get_proc(), p.get_args(), "proc_call")?;
+                Ok(())
             },
             Statement::Scope(s) => {
                 self.implement_scope(s)

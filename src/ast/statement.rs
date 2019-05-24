@@ -114,6 +114,12 @@ impl ProcedureCall {
                 ProcedureCall{procedure : procedure, arguments : arguments})
         )} else {Err("Invalid number of arguments to function call")}
     }
+    pub fn get_proc(&self) -> Rc<Function> {
+        self.procedure.clone()
+    }
+    pub fn get_args(&self) -> &[Expression]{
+        &self.arguments
+    }
 }
 
 impl DependencyVisitor for ProcedureCall {
