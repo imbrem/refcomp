@@ -294,7 +294,19 @@ fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Result<Statement, 
     let variable = pairs.next().unwrap();
     let expression = Expression::from_pair(pairs.next().unwrap(), sym)?;
     match variable.as_rule() {
-        Rule::array_index => panic!("Array index assignment not yet implemented!"),
+        Rule::array_index => {
+            let mut pairs = variable.into_inner();
+            let var = if let Some(Symbol::Variable(v)) =
+                sym.dereference(pairs.next().unwrap().as_str()) {v}
+                else {return Err("Cannot find array variable");};
+            let mut indices = Vec::new();
+            for pair in pairs {
+                indices.push(Expression::from_pair(pair, sym)?);
+            }
+            let idx = if let Expression::ArrayIndex(idx) = ArrayIndex::new(var, indices)? {idx}
+                else {unreachable!()};
+            Ok(Statement::Assignment(Assignment::to_index(idx, expression)))
+        },
         Rule::identifier => match sym.dereference(variable.as_str()) {
             Some(Symbol::Variable(v)) =>
                 Ok(Statement::Assignment(Assignment::to_variable(v, expression))),
