@@ -301,7 +301,7 @@ fn parse_assignment(pair : Pair<Rule>, sym : &SymbolTable) -> Result<Statement, 
                 else {return Err("Cannot find array variable");};
             let mut indices = Vec::new();
             for pair in pairs {
-                indices.push(Expression::from_pair(pair, sym)?);
+                indices.push(Expression::from_pair(pair.into_inner().next().unwrap(), sym)?);
             }
             let idx = if let Expression::ArrayIndex(idx) = ArrayIndex::new(var, indices)? {idx}
                 else {unreachable!()};
