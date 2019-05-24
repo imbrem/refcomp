@@ -45,6 +45,7 @@ pub struct Compiler {
     curr_fn : Option<FunctionValue>,
     printf_val : FunctionValue,
     scanf_val : FunctionValue,
+    breaks : Vec<BasicBlock>,
     strings : u64
 }
 
@@ -97,6 +98,7 @@ impl Compiler {
             curr_fn : None,
             printf_val : printf,
             scanf_val : scanf,
+            breaks : Vec::new(),
             strings : 0
         }
     }
@@ -458,8 +460,8 @@ impl Compiler {
                         *condition.as_int_value(),
                         &then_bb, &else_bb);
                     self.builder.position_at_end(&then_bb);
-                    self.implement_scope(&branch.scope)?;
-                    self.builder.build_unconditional_branch(&cont_bb);
+                    let jumped = self.implement_scope(&branch.scope)?;
+                    if !jumped {self.builder.build_unconditional_branch(&cont_bb);}
                     self.builder.position_at_end(&else_bb);
                     if last {
                         if let Some(scope) = &c.else_branch {
@@ -480,32 +482,47 @@ impl Compiler {
                 let body_bb = self.context.append_basic_block(&parent, "body");
                 // TODO: "loop stack" for break statements
                 let break_bb = self.context.append_basic_block(&parent, "break");
+                self.breaks.push(break_bb);
                 self.builder.build_conditional_branch(
                         *condition.as_int_value(),
-                        &body_bb, &break_bb
+                        &body_bb, self.breaks.last().unwrap()
                 );
                 self.builder.position_at_end(&body_bb);
-                self.implement_scope(&w.scope)?;
-                self.builder.build_unconditional_branch(&while_bb);
-                self.builder.position_at_end(&break_bb);
+                let jumped = self.implement_scope(&w.scope)?;
+                if !jumped {self.builder.build_unconditional_branch(&while_bb);}
+                self.builder.position_at_end(&self.breaks.pop().unwrap());
                 Ok(false)
             },
             Statement::Repeat(r) => {
                 let parent = self.get_curr();
                 let repeat_bb = self.context.append_basic_block(&parent, "repeat");
                 let cont_bb = self.context.append_basic_block(&parent, "cont");
+                self.breaks.push(cont_bb);
                 self.builder.build_unconditional_branch(&repeat_bb);
                 self.builder.position_at_end(&repeat_bb);
-                self.implement_scope(&r.scope)?;
-                let condition = self.implement_expression(&r.condition)?;
-                self.builder.build_conditional_branch(
-                    *condition.as_int_value(), &cont_bb, &repeat_bb
-                );
-                self.builder.position_at_end(&cont_bb);
+                let jumped = self.implement_scope(&r.scope)?;
+                if !jumped {
+                    let condition = self.implement_expression(&r.condition)?;
+                    self.builder.build_conditional_branch(
+                        *condition.as_int_value(), self.breaks.last().unwrap(), &repeat_bb
+                    );
+                }
+                self.builder.position_at_end(&self.breaks.pop().unwrap());
                 Ok(false)
             },
-            Statement::Break(_b) => {
-                Err("Break statements not yet implemented")
+            Statement::Break(b) => {
+                match b {
+                    0 => Ok(false),
+                    n => {
+                        match self.breaks.get(self.breaks.len() - *n as usize) {
+                            Some(br) => {
+                                self.builder.build_unconditional_branch(br);
+                                Ok(true)
+                            },
+                            None => Err("Break too deep!")
+                        }
+                    }
+                }
             },
             Statement::Return(r) => {
                 match r {

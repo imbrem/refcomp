@@ -339,6 +339,19 @@ pub fn parse_statement(pair : Pair<Rule>, sym : &mut SymbolTable) -> Result<Stat
             let cond = Expression::from_pair(pairs.next().unwrap(), sym)?;
             Ok(Statement::Repeat(Repeat{ condition : cond, scope : scope }))
         },
+        Rule::break_loop => {
+            let mut pairs = pair.into_inner();
+            Ok(Statement::Break(
+                if let Some(pair) = pairs.next() {
+                    match str::parse::<u32>(pair.as_str()) {
+                        Ok(int) => int,
+                        Err(_) => {return Err("Could not parse integer!");}
+                    }
+                } else {
+                    1
+                }
+            ))
+        }
         Rule::return_statement => match pair.into_inner().next() {
             Some(e) => Ok(Statement::Return(Some(Expression::from_pair(e, sym).unwrap()))),
             None => Ok(Statement::Return(None))
