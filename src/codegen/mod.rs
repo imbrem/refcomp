@@ -55,7 +55,15 @@ impl Compiler {
         match typ {
             Type::Null => None,
             Type::Void => None,
-            Type::ArrayType(_) => panic!("Array types not implemented!"),
+            Type::ArrayType(a) => {
+                let ty = self.get_llvm_type(Type::ScalarType(a.get_element_type()))?;
+                let mut dims = a.get_dims().iter();
+                let mut aty = ty.as_int_type().array_type(*dims.next().unwrap());
+                for dim in dims {
+                    aty = aty.array_type(*dim);
+                }
+                Some(aty.into())
+            },
             Type::ScalarType(s) => match s {
                 ScalarType::Integer => Some(self.context.i64_type().into()),
                 ScalarType::Boolean => Some(self.context.bool_type().into())
