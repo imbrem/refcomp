@@ -101,6 +101,10 @@ impl Compiler {
         }
     }
 
+    fn get_curr(&self) -> FunctionValue {
+        self.curr_fn.unwrap()
+    }
+
     fn gen_printf(context : &Context, module : &Module) -> FunctionValue {
         let printf_ty = context.i32_type().fn_type(
             &[context.i8_type().ptr_type(AddressSpace::Generic).into()],
@@ -441,8 +445,31 @@ impl Compiler {
                 self.builder.build_store(destination, value);
                 Ok(false)
             },
-            Statement::Conditional(_c) => {
-                Err("Conditionals not yet implemented")
+            Statement::Conditional(c) => {
+                let parent = self.get_curr();
+
+                for (i, branch) in c.conditional_branches.iter().enumerate() {
+                    let last = i + 1 >= c.conditional_branches.len();
+                    let condition = self.implement_expression(&branch.condition)?;
+                    let then_bb = self.context.append_basic_block(&parent, "then");
+                    let else_bb = self.context.append_basic_block(&parent, "else");
+                    let cont_bb = self.context.append_basic_block(&parent, "cont");
+                    self.builder.build_conditional_branch(
+                        *condition.as_int_value(),
+                        &then_bb, &else_bb);
+                    self.builder.position_at_end(&then_bb);
+                    self.implement_scope(&branch.scope)?;
+                    self.builder.build_unconditional_branch(&cont_bb);
+                    self.builder.position_at_end(&else_bb);
+                    if last {
+                        if let Some(scope) = &c.else_branch {
+                            self.implement_scope(scope)?;
+                        }
+                        self.builder.build_unconditional_branch(&cont_bb);
+                    }
+                    self.builder.position_at_end(&cont_bb);
+                }
+                Ok(false)
             },
             Statement::While(_w) => {
                 Err("While loops not yet implemented")
