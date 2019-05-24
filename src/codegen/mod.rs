@@ -471,8 +471,24 @@ impl Compiler {
                 }
                 Ok(false)
             },
-            Statement::While(_w) => {
-                Err("While loops not yet implemented")
+            Statement::While(w) => {
+                let parent = self.get_curr();
+                let while_bb = self.context.append_basic_block(&parent, "while");
+                self.builder.build_unconditional_branch(&while_bb);
+                self.builder.position_at_end(&while_bb);
+                let condition = self.implement_expression(&w.condition)?;
+                let body_bb = self.context.append_basic_block(&parent, "body");
+                // TODO: "loop stack" for break statements
+                let break_bb = self.context.append_basic_block(&parent, "break");
+                self.builder.build_conditional_branch(
+                        *condition.as_int_value(),
+                        &body_bb, &break_bb
+                );
+                self.builder.position_at_end(&body_bb);
+                self.implement_scope(&w.scope)?;
+                self.builder.build_unconditional_branch(&while_bb);
+                self.builder.position_at_end(&break_bb);
+                Ok(false)
             },
             Statement::Repeat(_r) => {
                 Err("Repeat loops not yet implemented")
