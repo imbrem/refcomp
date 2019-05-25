@@ -354,6 +354,12 @@ impl ArrayIndex {
             _ => Err("Tried to array index non array type")
         }
     }
+    pub fn get_variable(&self) -> Rc<Variable> {
+        self.variable.clone()
+    }
+    pub fn get_indices(&self) -> &[Expression] {
+        &self.index
+    }
 }
 
 impl Typed for ArrayIndex {
@@ -444,7 +450,7 @@ impl Expression {
                 let mut idxers = Vec::new();
                 for pair in pairs {
                     assert_eq!(pair.as_rule(), Rule::array_indexer);
-                    idxers.push(Self::from_pair(pair, sym)?)
+                    idxers.push(Self::from_pair(pair.into_inner().next().unwrap(), sym)?)
                 }
                 ArrayIndex::new(var, idxers)
             }

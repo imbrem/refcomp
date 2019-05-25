@@ -2,7 +2,9 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
-use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp, ComparisonOp};
+use crate::ast::expression::{
+    Constant, Expression, UnaryExpression, ArithmeticOp, ComparisonOp, ArrayIndex
+};
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
@@ -389,8 +391,9 @@ impl Compiler {
                 let ptr = self.get_variable(v.clone());
                 Ok(self.builder.build_load(ptr, "loadtmp"))
             },
-            Expression::ArrayIndex(_a) => {
-                Err("Array indices not yet implemented")
+            Expression::ArrayIndex(a) => {
+                let ptr = self.get_index(&a)?;
+                Ok(self.builder.build_load(ptr, "arr_loadtmp"))
             },
             Expression::FunctionCall(f) => {
                 Ok(
@@ -419,7 +422,18 @@ impl Compiler {
         }
     }
 
-    fn get_destination(&mut self, destination : &AssignmentDestination) -> Result<PointerValue, &'static str> {
+    fn get_index(&mut self, index : &ArrayIndex) -> Result<PointerValue, &'static str> {
+        let var = self.get_variable(index.get_variable());
+        let indices : Result<Vec<IntValue>, &'static str> = index.get_indices().iter()
+            .map(|e| self.implement_expression(e).map(|r| r.into_int_value()))
+            .collect();
+        unsafe {
+            Ok(self.builder.build_in_bounds_gep(var, &(indices?), "gep_arr"))
+        }
+    }
+
+    fn get_destination(&mut self, destination : &AssignmentDestination)
+    -> Result<PointerValue, &'static str> {
         match destination {
             AssignmentDestination::Variable(v) => Ok(self.get_variable(v.clone())),
             AssignmentDestination::ArrayIndex(_) => Err("Array indices not yet implemented!")
