@@ -424,11 +424,13 @@ impl Compiler {
 
     fn get_index(&mut self, index : &ArrayIndex) -> Result<PointerValue, &'static str> {
         let var = self.get_variable(index.get_variable());
-        let indices : Result<Vec<IntValue>, &'static str> = index.get_indices().iter()
+        let maybe_indices : Result<Vec<IntValue>, &'static str> = index.get_indices().iter()
             .map(|e| self.implement_expression(e).map(|r| r.into_int_value()))
             .collect();
+        let mut indices = vec![self.context.i64_type().const_zero()];
+        indices.extend(maybe_indices?);
         unsafe {
-            Ok(self.builder.build_in_bounds_gep(var, &(indices?), "gep_arr"))
+            Ok(self.builder.build_in_bounds_gep(var, &indices, "gep_arr"))
         }
     }
 
@@ -436,7 +438,7 @@ impl Compiler {
     -> Result<PointerValue, &'static str> {
         match destination {
             AssignmentDestination::Variable(v) => Ok(self.get_variable(v.clone())),
-            AssignmentDestination::ArrayIndex(_) => Err("Array indices not yet implemented!")
+            AssignmentDestination::ArrayIndex(a) => self.get_index(a)
         }
     }
 
