@@ -2,7 +2,9 @@
 // https://github.com/TheDan64/inkwell/blob/master/examples/kaleidoscope/main.rs
 // by TheDan64
 
-use crate::ast::expression::{Constant, Expression, UnaryExpression, ArithmeticOp, ComparisonOp};
+use crate::ast::expression::{
+    Constant, Expression, UnaryExpression, ArithmeticOp, ComparisonOp, ArrayIndex
+};
 use crate::ast::statement::Statement;
 use inkwell::IntPredicate;
 use inkwell::types::BasicTypeEnum;
@@ -45,6 +47,7 @@ pub struct Compiler {
     curr_fn : Option<FunctionValue>,
     printf_val : FunctionValue,
     scanf_val : FunctionValue,
+    breaks : Vec<BasicBlock>,
     strings : u64
 }
 
@@ -54,7 +57,15 @@ impl Compiler {
         match typ {
             Type::Null => None,
             Type::Void => None,
-            Type::ArrayType(_) => panic!("Array types not implemented!"),
+            Type::ArrayType(a) => {
+                let ty = self.get_llvm_type(Type::ScalarType(a.get_element_type()))?;
+                let mut dims = a.get_dims().iter();
+                let mut aty = ty.as_int_type().array_type(*dims.next().unwrap());
+                for dim in dims {
+                    aty = aty.array_type(*dim);
+                }
+                Some(aty.into())
+            },
             Type::ScalarType(s) => match s {
                 ScalarType::Integer => Some(self.context.i64_type().into()),
                 ScalarType::Boolean => Some(self.context.bool_type().into())
@@ -97,8 +108,13 @@ impl Compiler {
             curr_fn : None,
             printf_val : printf,
             scanf_val : scanf,
+            breaks : Vec::new(),
             strings : 0
         }
+    }
+
+    fn get_curr(&self) -> FunctionValue {
+        self.curr_fn.unwrap()
     }
 
     fn gen_printf(context : &Context, module : &Module) -> FunctionValue {
@@ -167,6 +183,7 @@ impl Compiler {
         match ty {
             BasicTypeEnum::FloatType(f) => f.const_zero().into(),
             BasicTypeEnum::IntType(i) => i.const_zero().into(),
+            BasicTypeEnum::ArrayType(a) => a.const_zero().into(),
             t => panic!("Type {:?} not supported!", t)
         }
     }
@@ -374,8 +391,9 @@ impl Compiler {
                 let ptr = self.get_variable(v.clone());
                 Ok(self.builder.build_load(ptr, "loadtmp"))
             },
-            Expression::ArrayIndex(_a) => {
-                Err("Array indices not yet implemented")
+            Expression::ArrayIndex(a) => {
+                let ptr = self.get_index(&a)?;
+                Ok(self.builder.build_load(ptr, "arr_loadtmp"))
             },
             Expression::FunctionCall(f) => {
                 Ok(
@@ -404,10 +422,23 @@ impl Compiler {
         }
     }
 
-    fn get_destination(&mut self, destination : &AssignmentDestination) -> Result<PointerValue, &'static str> {
+    fn get_index(&mut self, index : &ArrayIndex) -> Result<PointerValue, &'static str> {
+        let var = self.get_variable(index.get_variable());
+        let maybe_indices : Result<Vec<IntValue>, &'static str> = index.get_indices().iter()
+            .map(|e| self.implement_expression(e).map(|r| r.into_int_value()))
+            .collect();
+        let mut indices = vec![self.context.i64_type().const_zero()];
+        indices.extend(maybe_indices?);
+        unsafe {
+            Ok(self.builder.build_in_bounds_gep(var, &indices, "gep_arr"))
+        }
+    }
+
+    fn get_destination(&mut self, destination : &AssignmentDestination)
+    -> Result<PointerValue, &'static str> {
         match destination {
             AssignmentDestination::Variable(v) => Ok(self.get_variable(v.clone())),
-            AssignmentDestination::ArrayIndex(_) => Err("Array indices not yet implemented!")
+            AssignmentDestination::ArrayIndex(a) => self.get_index(a)
         }
     }
 
@@ -441,17 +472,82 @@ impl Compiler {
                 self.builder.build_store(destination, value);
                 Ok(false)
             },
-            Statement::Conditional(_c) => {
-                Err("Conditionals not yet implemented")
+            Statement::Conditional(c) => {
+                let parent = self.get_curr();
+
+                for (i, branch) in c.conditional_branches.iter().enumerate() {
+                    let last = i + 1 >= c.conditional_branches.len();
+                    let condition = self.implement_expression(&branch.condition)?;
+                    let then_bb = self.context.append_basic_block(&parent, "then");
+                    let else_bb = self.context.append_basic_block(&parent, "else");
+                    let cont_bb = self.context.append_basic_block(&parent, "cont");
+                    self.builder.build_conditional_branch(
+                        *condition.as_int_value(),
+                        &then_bb, &else_bb);
+                    self.builder.position_at_end(&then_bb);
+                    let jumped = self.implement_scope(&branch.scope)?;
+                    if !jumped {self.builder.build_unconditional_branch(&cont_bb);}
+                    self.builder.position_at_end(&else_bb);
+                    if last {
+                        if let Some(scope) = &c.else_branch {
+                            self.implement_scope(scope)?;
+                        }
+                        self.builder.build_unconditional_branch(&cont_bb);
+                    }
+                    self.builder.position_at_end(&cont_bb);
+                }
+                Ok(false)
             },
-            Statement::While(_w) => {
-                Err("While loops not yet implemented")
+            Statement::While(w) => {
+                let parent = self.get_curr();
+                let while_bb = self.context.append_basic_block(&parent, "while");
+                self.builder.build_unconditional_branch(&while_bb);
+                self.builder.position_at_end(&while_bb);
+                let condition = self.implement_expression(&w.condition)?;
+                let body_bb = self.context.append_basic_block(&parent, "body");
+                // TODO: "loop stack" for break statements
+                let break_bb = self.context.append_basic_block(&parent, "break");
+                self.breaks.push(break_bb);
+                self.builder.build_conditional_branch(
+                        *condition.as_int_value(),
+                        &body_bb, self.breaks.last().unwrap()
+                );
+                self.builder.position_at_end(&body_bb);
+                let jumped = self.implement_scope(&w.scope)?;
+                if !jumped {self.builder.build_unconditional_branch(&while_bb);}
+                self.builder.position_at_end(&self.breaks.pop().unwrap());
+                Ok(false)
             },
-            Statement::Repeat(_r) => {
-                Err("Repeat loops not yet implemented")
+            Statement::Repeat(r) => {
+                let parent = self.get_curr();
+                let repeat_bb = self.context.append_basic_block(&parent, "repeat");
+                let cont_bb = self.context.append_basic_block(&parent, "cont");
+                self.breaks.push(cont_bb);
+                self.builder.build_unconditional_branch(&repeat_bb);
+                self.builder.position_at_end(&repeat_bb);
+                let jumped = self.implement_scope(&r.scope)?;
+                if !jumped {
+                    let condition = self.implement_expression(&r.condition)?;
+                    self.builder.build_conditional_branch(
+                        *condition.as_int_value(), self.breaks.last().unwrap(), &repeat_bb
+                    );
+                }
+                self.builder.position_at_end(&self.breaks.pop().unwrap());
+                Ok(false)
             },
-            Statement::Break(_b) => {
-                Err("Break statements not yet implemented")
+            Statement::Break(b) => {
+                match b {
+                    0 => Ok(false),
+                    n => {
+                        match self.breaks.get(self.breaks.len() - *n as usize) {
+                            Some(br) => {
+                                self.builder.build_unconditional_branch(br);
+                                Ok(true)
+                            },
+                            None => Err("Break too deep!")
+                        }
+                    }
+                }
             },
             Statement::Return(r) => {
                 match r {
